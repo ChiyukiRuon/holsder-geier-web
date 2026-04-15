@@ -1,0 +1,114 @@
+// 用户信息
+import {RoomStatus} from "@/types/enums";
+
+export interface UserInfo {
+    userId: string;
+    nickname: string;
+    avatar: string;
+    background: string;
+    color: string;
+}
+
+// 玩家卡片信息
+export interface PlayerCard {
+    count: number;
+    list: number[];
+    background: string | null;
+}
+
+// 玩家积分信息
+export interface PlayerPoint {
+    count: number;
+    list: number[];
+}
+
+// 玩家游戏状态
+export interface PlayerGameState {
+    userId: string;
+    nickname: string;
+    avatar: string;
+    background: string;
+    card: PlayerCard;
+    point: PlayerPoint;
+    ready: boolean;
+    latency?: number;
+}
+
+// 玩家信息（用于 UI 显示）
+export interface PlayerInfo {
+    user: UserInfo;
+    card: number[];
+    point: {
+        count: number;
+        list: number[];
+    };
+    lastAction?: {
+        card: number;
+    };
+    ready: boolean;
+    latency?: number;
+}
+
+// 房间信息
+export interface RoomData {
+    roomId: string;
+    players: PlayerGameState[];
+    status: RoomStatus;
+    maxPlayers: number;
+}
+
+// 聊天消息
+export interface ChatMessage {
+    userId: string;
+    message: string;
+    timestamp: number;
+}
+
+// 消息基础结构（通用）
+export interface WSMessageBase {
+    type: string;
+    requestId?: string;
+}
+
+// Kook 用户信息
+export interface KookUserInfo {
+    id: string;
+    username: string;
+    avatar: string;
+    identify_num: string;
+    online: boolean;
+    os: string;
+    status: number;
+    banner: string;
+    nickname: string;
+    roles: string[];
+    vip_amp: boolean;
+    bot: boolean;
+    nameplate: string[];
+    kpm_vip: null;
+    wealth_level: number;
+    decorations_id_map: {
+        join_voice: number;
+        background: number;
+        nameplate: number,
+        nameplates: number[]
+    },
+    mobile_verified: boolean,
+    is_sys: boolean
+}
+
+// 图片上传响应类型
+export interface UploadResponse {
+    key: string;
+    etag: string;
+    size: number;
+    mimetype: string;
+}
+
+// 房间信息
+export interface RoomInfo {
+    roomId: string;
+    players: PlayerInfo[];
+    status: RoomStatus;
+    createdAt: number;
+}
