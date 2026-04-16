@@ -35,6 +35,7 @@ export const generateUserColor = (): string => {
 
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
+
 export const getGoogleProfile = async (token: string): Promise<{
     name: string;
     avatar: string;
@@ -50,20 +51,3 @@ export const getGoogleProfile = async (token: string): Promise<{
         avatar: data.picture ?? "",
     };
 };
-
-export const getKOOKProfile = async (token: string): Promise<{
-    name: string;
-    avatar: string;
-}> => {
-    const res = await fetch("https://api.kookapp.cn/user/me", {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
-    const data = await res.json();
-    return {
-        name: data.username ?? "",
-        avatar: data.avatar ?? "",
-    };
-};
-

@@ -1,9 +1,20 @@
-import {apiClient} from "@/lib/axios";
+import {apiClient, get} from "@/lib/axios";
 import {KookUserInfo} from "@/types";
 
 export async function getKookUserInfo(code: string): Promise<{ avatar: string, nickname: string }> {
     try {
-        const response = await apiClient.get<KookUserInfo>(`/auth/kook/userinfo?code=${code}&redirectUrl=https://hdg.chiyukiruon.top/koauth`);
+        const response = await get<KookUserInfo>(
+            apiClient,
+            "/kook/user",
+            {
+                params: {
+                    code: code,
+                    redirectUrl: "https://hdg.chiyukiruon.top/koauth",
+                },
+            }
+        );
+
+        console.log("kook resp", response);
 
         return {
             avatar: response.avatar,

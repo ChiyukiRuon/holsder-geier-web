@@ -9,29 +9,10 @@ export interface UserInfo {
     color: string;
 }
 
-// 玩家卡片信息
-export interface PlayerCard {
-    count: number;
-    list: number[];
-    background: string | null;
-}
-
 // 玩家积分信息
 export interface PlayerPoint {
     count: number;
     list: number[];
-}
-
-// 玩家游戏状态
-export interface PlayerGameState {
-    userId: string;
-    nickname: string;
-    avatar: string;
-    background: string;
-    card: PlayerCard;
-    point: PlayerPoint;
-    ready: boolean;
-    latency?: number;
 }
 
 // 玩家信息（用于 UI 显示）
@@ -42,24 +23,41 @@ export interface PlayerInfo {
         count: number;
         list: number[];
     };
-    lastAction?: {
-        card: number;
-    };
+    currentPlayerCard?: number;
+    lastPlayerCard?: number;
     ready: boolean;
-    latency?: number;
+    latency: number;
+}
+
+export interface PlayerLatency {
+    userId: string;
+    latency: number;
 }
 
 // 房间信息
-export interface RoomData {
+export interface RoomInfo {
     roomId: string;
-    players: PlayerGameState[];
+    players: PlayerInfo[];
     status: RoomStatus;
     maxPlayers: number;
 }
 
 // 聊天消息
-export interface ChatMessage {
-    userId: string;
+export type ReceiveChatMessage =
+    | {
+    user: UserInfo;
+    type: 'user';
+    message: string;
+    timestamp: number;
+}
+    | {
+    type: 'system';
+    message: string;
+    timestamp: number;
+};
+
+export interface SendChatMessage {
+    user: UserInfo;
     message: string;
     timestamp: number;
 }
@@ -103,12 +101,4 @@ export interface UploadResponse {
     etag: string;
     size: number;
     mimetype: string;
-}
-
-// 房间信息
-export interface RoomInfo {
-    roomId: string;
-    players: PlayerInfo[];
-    status: RoomStatus;
-    createdAt: number;
 }

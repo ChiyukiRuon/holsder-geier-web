@@ -1,44 +1,18 @@
-import { API_CONFIG } from './axios';
+import {API_CONFIG} from './axios';
 import type {
-    WSErrorCode,
-    GameStage,
-    RoomStatus,
-    CardType,
     UserInfo,
-    PlayerCard,
-    PlayerPoint,
-    PlayerGameState,
-    RoomData,
-    ScoreCard,
-    GameState,
-    ChatMessage,
-    WSMessageBase,
+    WSMessage,
+    WSEventHandler,
+    WSConnectionOptions,
     UserUpdateMessage,
     RoomCreateMessage,
     RoomJoinMessage,
     RoomLeaveMessage,
     RoomListMessage,
     GameReadyMessage,
-    GameStageRequestMessage,
+    GameStateMessage,
     GameActionMessage,
-    ChatSendMessage,
-    ServerInfoMessage,
-    ServerAckMessage,
-    ServerErrorMessage,
-    RoomUpdateMessage,
-    RoomListResponseMessage,
-    GameStartMessage,
-    GameStageResponseMessage,
-    GameSyncMessage,
-    GameResolveMessage,
-    GameEndMessage,
-    ChatReceiveMessage,
-    ChatSyncMessage,
-    ServerMessage,
-    ClientMessage,
-    WSMessage,
-    WSEventHandler,
-    WSConnectionOptions,
+    ChatSendMessage, WSRequestMap,
 } from '@/types';
 
 class WebSocketManager {
@@ -50,20 +24,18 @@ class WebSocketManager {
     private messageQueue: WSMessage[] = [];
 
     /**
-     * 连接到游戏房间
+     * 连接
      */
     connect(options: WSConnectionOptions): void {
         if (this.ws?.readyState === WebSocket.OPEN) {
-            this.disconnect();
+            return;
         }
 
         this.options = options;
         this.shouldReconnect = options.reconnect ?? true;
 
-        const wsUrl = `${API_CONFIG.WS_URL}/ws?roomId=${options.roomId}&userId=${options.userId}`;
-
         try {
-            this.ws = new WebSocket(wsUrl);
+            this.ws = new WebSocket(API_CONFIG.WS_URL);
 
             this.ws.onopen = () => {
                 console.log('WebSocket connected');
@@ -101,17 +73,40 @@ class WebSocketManager {
     }
 
     /**
-     * 处理接收到的消息
+     * 处理消息
      */
     private handleMessage(message: WSMessage): void {
+        if (message.type === 'server.ping') {
+            this.send({
+                type: 'client.pong',
+                payload: { clientTime: Date.now() },
+            });
+        }
+
+        if (message.type === 'server.ack' && message.payload?.requestId) {
+            const pending = this.pendingRequests.get(message.payload.requestId);
+            if (pending) {
+                clearTimeout(pending.timeout);
+                pending.resolve(message.payload);
+                this.pendingRequests.delete(message.payload.requestId);
+            }
+            return;
+        }
+
+        if (message.type === 'server.error' && message.payload?.requestId) {
+            const pending = this.pendingRequests.get(message.payload.requestId);
+            if (pending) {
+                clearTimeout(pending.timeout);
+                pending.reject(message.payload);
+                this.pendingRequests.delete(message.payload.requestId);
+            }
+            return;
+        }
+
         const handlers = this.eventHandlers.get(message.type);
         if (handlers) {
             handlers.forEach((handler) => {
-                try {
-                    handler(message.payload);
-                } catch (error) {
-                    console.error('Event handler error:', error);
-                }
+                handler('payload' in message ? message.payload : undefined);
             });
         }
     }
@@ -123,16 +118,38 @@ class WebSocketManager {
         if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
-            // 队列消息，等待连接后发送
-            this.messageQueue.push(message as WSMessage);
+            this.messageQueue.push(message);
         }
     }
 
+    sendWithAck<K extends keyof WSRequestMap>(
+        message: WSMessage,
+        timeoutMs = 5000
+    ): Promise<WSRequestMap[K]> {
+        const requestId = message.requestId ?? crypto.randomUUID();
+        message.requestId = requestId;
+
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                this.pendingRequests.delete(requestId);
+                reject(new Error('Request timeout'));
+            }, timeoutMs);
+
+            this.pendingRequests.set(requestId, {
+                resolve: resolve as (value: unknown) => void,
+                reject,
+                timeout,
+            });
+
+            this.send(message);
+        });
+    }
+
     /**
-     * 更新用户信息
+     * 用户更新
      */
-    updateUser(payload: { nickname?: string; avatar?: string; background?: string }): void {
-        this.send<UserUpdateMessage>({
+    updateUser(payload: UserInfo) {
+        return this.sendWithAck({
             type: 'user.update',
             payload,
         });
@@ -141,19 +158,19 @@ class WebSocketManager {
     /**
      * 创建房间
      */
-    createRoom(roomId: string, user: UserInfo): void {
-        this.send<RoomCreateMessage>({
+    createRoom(roomId: string, user: UserInfo) {
+        return this.sendWithAck({
             type: 'room.create',
             requestId: this.generateRequestId(),
-            payload: { roomId, user },
+            payload: {roomId, user},
         });
     }
 
     /**
      * 加入房间
      */
-    joinRoom(roomId: string, user: UserInfo, reconnect = false): void {
-        this.send<RoomJoinMessage>({
+    joinRoom(roomId: string, user: UserInfo, reconnect = false) {
+        return this.sendWithAck({
             type: 'room.join',
             requestId: this.generateRequestId(),
             payload: { roomId, user, reconnect },
@@ -163,8 +180,8 @@ class WebSocketManager {
     /**
      * 离开房间
      */
-    leaveRoom(): void {
-        this.send<RoomLeaveMessage>({
+    leaveRoom() {
+        return this.sendWithAck({
             type: 'room.leave',
             requestId: this.generateRequestId(),
             payload: {},
@@ -172,62 +189,44 @@ class WebSocketManager {
     }
 
     /**
-     * 获取房间列表
+     * 准备状态
      */
-    getRoomList(): void {
-        this.send<RoomListMessage>({
-            type: 'room.list',
-            requestId: this.generateRequestId(),
-            payload: {},
-        });
-    }
-
-    /**
-     * 玩家准备/取消准备
-     */
-    setReady(ready: boolean): void {
-        this.send<GameReadyMessage>({
+    setReady(ready: boolean) {
+        return this.sendWithAck({
             type: 'game.ready',
             requestId: this.generateRequestId(),
-            payload: { ready },
+            payload: {ready},
         });
     }
 
     /**
-     * 获取游戏状态
+     * 游戏操作
      */
-    getGameStage(): void {
-        this.send<GameStageRequestMessage>({
-            type: 'game.stage',
-            requestId: this.generateRequestId(),
-            payload: {},
-        });
-    }
-
-    /**
-     * 发送游戏动作
-     */
-    sendGameAction(actionId: string, actionType: string, data: { card: number }): void {
-        this.send<GameActionMessage>({
+    sendGameAction(actionId: string, actionType: string, data: { card: number }) {
+        return this.sendWithAck({
             type: 'game.action',
             requestId: this.generateRequestId(),
-            payload: { actionId, actionType, data },
+            payload: {actionId, actionType, data},
         });
     }
 
     /**
-     * 发送聊天消息
+     * 聊天
      */
-    sendChatMessage(message: string): void {
-        this.send<ChatSendMessage>({
+    sendChatMessage(message: string, user: UserInfo) {
+        return this.sendWithAck({
             type: 'chat.send',
             requestId: this.generateRequestId(),
-            payload: { message },
+            payload: {
+                user,
+                message,
+                timestamp: Date.now(),
+            },
         });
     }
 
     /**
-     * 注册消息事件处理器
+     * 事件订阅
      */
     on<T = unknown>(type: string, handler: WSEventHandler<T>): () => void {
         if (!this.eventHandlers.has(type)) {
@@ -235,14 +234,13 @@ class WebSocketManager {
         }
         this.eventHandlers.get(type)!.add(handler as WSEventHandler);
 
-        // 返回取消订阅函数
         return () => {
             this.eventHandlers.get(type)?.delete(handler as WSEventHandler);
         };
     }
 
     /**
-     * 移除所有事件处理器
+     * 移除事件
      */
     off(type: string): void {
         this.eventHandlers.delete(type);
@@ -254,14 +252,24 @@ class WebSocketManager {
     disconnect(): void {
         this.shouldReconnect = false;
         this.cleanup();
+
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
     }
 
+    private pendingRequests = new Map<
+        string,
+        {
+            resolve: (value: unknown) => void;
+            reject: (reason?: unknown) => void;
+            timeout: ReturnType<typeof setTimeout>;
+        }
+    >();
+
     /**
-     * 清理资源
+     * 清理
      */
     private cleanup(): void {
         if (this.reconnectTimer) {
@@ -271,22 +279,21 @@ class WebSocketManager {
     }
 
     /**
-     * 调度重连
+     * 重连
      */
     private scheduleReconnect(): void {
         if (!this.options || !this.shouldReconnect) return;
 
-        const attempts = this.options.reconnectAttempts ?? 5;
         const interval = this.options.reconnectInterval ?? 3000;
 
         this.reconnectTimer = setTimeout(() => {
-            console.log('Attempting to reconnect...');
+            console.log('Reconnecting...');
             this.connect(this.options!);
         }, interval);
     }
 
     /**
-     * 刷新消息队列
+     * 刷新队列
      */
     private flushMessageQueue(): void {
         while (this.messageQueue.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
@@ -298,26 +305,18 @@ class WebSocketManager {
     }
 
     /**
-     * 获取连接状态
-     */
-    getReadyState(): number {
-        return this.ws?.readyState ?? WebSocket.CLOSED;
-    }
-
-    /**
-     * 检查是否已连接
+     * 状态
      */
     isConnected(): boolean {
         return this.ws?.readyState === WebSocket.OPEN;
     }
 
     /**
-     * 生成请求ID
+     * 请求ID
      */
     private generateRequestId(): string {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        return crypto.randomUUID();
     }
 }
 
-// 导出单例
 export const wsManager = new WebSocketManager();

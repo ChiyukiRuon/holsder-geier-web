@@ -3,6 +3,11 @@ import axios, { type AxiosInstance, type AxiosResponse, type InternalAxiosReques
 const API_BASE_URL = '/api';
 const WS_URL = '/ws';
 
+interface RequestOptions {
+    params?: Record<string, unknown>;
+    headers?: Record<string, string>;
+}
+
 const createAxiosInstance = (): AxiosInstance => {
     const instance = axios.create({
         baseURL: API_BASE_URL,
@@ -22,7 +27,10 @@ const createAxiosInstance = (): AxiosInstance => {
 
     // 响应拦截器
     instance.interceptors.response.use(
-        (response: AxiosResponse) => response.data,
+        (response: AxiosResponse) => {
+            console.log('响应数据:', response.data.data)
+            return response.data
+        },
         (error) => {
             // 统一错误消息
             const message = error.response?.data?.message || error.message || '请求失败';
@@ -34,6 +42,12 @@ const createAxiosInstance = (): AxiosInstance => {
 };
 
 export const apiClient: AxiosInstance = createAxiosInstance();
+
+export const get = <T = unknown>(client: AxiosInstance, url: string, options: RequestOptions = {}) =>
+    client.get<T>(url, { params: options.params, headers: options.headers }).then((res: AxiosResponse<T>) => res.data);
+
+export const post = <T = unknown>(client: AxiosInstance, url: string, data: Record<string, unknown> = {}, options: RequestOptions = {}) =>
+    client.post<T>(url, data, { headers: options.headers }).then((res: AxiosResponse<T>) => res.data);
 
 export const API_CONFIG = {
     BASE_URL: API_BASE_URL,

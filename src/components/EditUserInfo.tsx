@@ -5,8 +5,18 @@ import Google from "@/components/icons/Google";
 import {useState, useRef, useEffect} from "react";
 import { UserInfo } from "@/types";
 import {useGoogleLogin} from "@react-oauth/google";
-import {getGoogleProfile} from "@/utils/user";
-import {Button, toast} from "@heroui/react";
+import {generateUserColor, getGoogleProfile} from "@/utils/user";
+import {
+    Button,
+    ColorArea,
+    ColorField,
+    ColorPicker,
+    ColorSlider,
+    ColorSwatch,
+    Label,
+    parseColor,
+    toast
+} from "@heroui/react";
 import ImageCropper from "@/components/ImageCropper";
 import {uploadImage} from "@/lib/api/file";
 import {getObjectURL} from "@/utils/upload";
@@ -69,7 +79,7 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
 
     const handleKookLogin = () => {
         const clientId = "XG7IAyXh63KhEYAE";
-        const redirectUri = "https://hdg.chiyukiruon.top/koauth";
+        const redirectUri = "http://local.chiyukiruon.top:3000/koauth";
         const scope = "get_user_info";
 
         const authUrl = `https://www.kookapp.cn/app/oauth2/authorize?id=24532&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
@@ -87,7 +97,7 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
         );
 
         if (!popup) {
-            alert("请允许弹出窗口以进行KOOK登录");
+            toast.warning("请允许弹出窗口以进行KOOK登录");
             return;
         }
 
@@ -213,9 +223,7 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                         <div className="scale-125">
                             <ShowUserInfo
                                 type={"md"}
-                                name={tempNickname}
-                                color={tempColor}
-                                avatarUrl={tempAvatar}
+                                user={tempUserInfo}
                             />
                         </div>
 
@@ -231,19 +239,20 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">玩家名</label>
                             <div className="flex items-center gap-2">
                                 <input
-                                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-900 font-bold text-sm border-[3px] border-slate-100 outline-none transition-all focus:border-slate-300 focus:bg-white placeholder:text-slate-400"
+                                    className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-slate-900 font-bold text-sm border-[3px] border-slate-100 outline-none transition-all focus:border-slate-300 focus:bg-white placeholder:text-slate-400"
                                     value={tempNickname}
                                     onChange={(e) => setTempNickname(e.target.value)}
                                     placeholder="Enter nickname..."
                                 />
                                 <button
-                                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
+                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
                                     onClick={handleKookLogin}
                                 >
                                     <KOOK size={20} />
                                 </button>
-                                <button className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
-                                        onClick={() => handleGoogleLogin()}
+                                <button
+                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
+                                    onClick={() => handleGoogleLogin()}
                                 >
                                     <Google size={20} />
                                 </button>
@@ -254,13 +263,13 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">头像</label>
                             <div className="flex gap-2">
                                 <input
-                                    className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold border-[3px] border-slate-100 outline-none focus:border-slate-300"
+                                    className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-xs font-bold border-[3px] border-slate-100 outline-none focus:border-slate-300"
                                     placeholder="Image URL..."
                                     value={tempAvatar}
                                     onChange={(e) => setTempAvatar(e.target.value)}
                                 />
                                 <button
-                                    className="px-4 py-2 rounded-xl bg-slate-200 text-slate-700 font-black text-[10px] uppercase border-[3px] border-slate-200 hover:bg-slate-300 active:scale-95 transition-all"
+                                    className="h-10 px-4 rounded-xl bg-slate-200 text-slate-700 font-black text-[10px] uppercase border-[3px] border-slate-200 hover:bg-slate-300 active:scale-95 transition-all"
                                     onClick={() => avatarFileInputRef.current?.click()}
                                     disabled={isUploading}
                                 >
@@ -278,32 +287,77 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
 
                         <section className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">主题色</label>
-                            <div className="flex items-center gap-3 p-2 bg-slate-100 rounded-xl border-[3px] border-slate-100">
-                                <input
-                                    type="color"
-                                    className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none"
-                                    value={tempColor}
-                                    onChange={(e) => setTempColor(e.target.value)}
-                                />
-                                <input
-                                    className="flex-1 bg-transparent font-mono font-bold text-sm outline-none uppercase text-slate-600"
-                                    value={tempColor}
-                                    readOnly
-                                />
-                            </div>
+                            <ColorPicker
+                                value={parseColor(tempColor || "#6366f1")}
+                                onChange={(color) => setTempColor(color.toString("hex"))}
+                                className="w-full"
+                            >
+                                <ColorPicker.Trigger className="w-full h-10 px-2 bg-slate-100 rounded-xl border-[3px] border-slate-100 hover:border-slate-300 transition-all">
+                                    <ColorSwatch size="sm" />
+                                    <Label className=" flex-1 font-mono font-bold text-sm uppercase text-slate-600" style={{ textAlign: "left" }}>
+                                        {tempColor || generateUserColor()}
+                                    </Label>
+                                </ColorPicker.Trigger>
+                                <ColorPicker.Popover className="p-4 gap-3">
+                                    <ColorArea
+                                        aria-label="颜色区域"
+                                        className=""
+                                        colorSpace="hsb"
+                                        xChannel="saturation"
+                                        yChannel="brightness"
+                                    >
+                                        <ColorArea.Thumb />
+                                    </ColorArea>
+                                    <ColorSlider
+                                        aria-label="色相滑块"
+                                        channel="hue"
+                                        className="gap-1 px-1"
+                                        colorSpace="hsb"
+                                    >
+                                        <ColorSlider.Track>
+                                            <ColorSlider.Thumb />
+                                        </ColorSlider.Track>
+                                    </ColorSlider>
+                                    <ColorField aria-label="颜色值输入">
+                                        <ColorField.Group variant="secondary">
+                                            <ColorField.Prefix>
+                                                <ColorSwatch size="xs" />
+                                            </ColorField.Prefix>
+                                            <ColorField.Input
+                                                className="font-mono text-xs font-bold"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const input = e.currentTarget;
+                                                        const value = input.value.trim();
+
+                                                        if (value && /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                                            setTempColor(value);
+                                                            input.blur();
+                                                        } else if (value && /^[0-9A-Fa-f]{6}$/.test(value)) {
+                                                            setTempColor(`#${value}`);
+                                                            input.blur();
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </ColorField.Group>
+                                    </ColorField>
+                                </ColorPicker.Popover>
+                            </ColorPicker>
                         </section>
 
                         <section className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">卡牌背景</label>
                             <div className="flex gap-2">
                                 <input
-                                    className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold border-[3px] border-slate-100 outline-none focus:border-slate-300"
+                                    className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-xs font-bold border-[3px] border-slate-100 outline-none focus:border-slate-300"
                                     placeholder="Background URL..."
                                     value={tempBackground}
                                     onChange={(e) => setTempBackground(e.target.value)}
                                 />
                                 <button
-                                    className="px-4 py-2 rounded-xl bg-slate-200 text-slate-700 font-black text-[10px] uppercase border-[3px] border-slate-200 hover:bg-slate-300 active:scale-95 transition-all"
+                                    className="h-10 px-4 rounded-xl bg-slate-200 text-slate-700 font-black text-[10px] uppercase border-[3px] border-slate-200 hover:bg-slate-300 active:scale-95 transition-all"
                                     onClick={() => backgroundFileInputRef.current?.click()}
                                     disabled={isUploading}
                                 >

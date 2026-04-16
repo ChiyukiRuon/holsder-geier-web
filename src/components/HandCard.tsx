@@ -45,7 +45,6 @@ export const HandCard = ({
                         className="absolute inset-0 opacity-20"
                         style={{
                             background: `radial-gradient(circle at center, ${user.color} 0%, transparent 100%)`,
-                            backgroundColor: 'white',
                         }}
                     />
 
@@ -85,9 +84,7 @@ export const HandCard = ({
                                     <ShowUserInfo
                                         type="sm"
                                         size={16}
-                                        name={user.nickname}
-                                        color={user.color}
-                                        avatarUrl={user.avatar}
+                                        user={user}
                                     />
                                 </div>
                                 {/* 辅助文字 */}
@@ -168,7 +165,7 @@ export const HandCard = ({
                         placement="top-right"
                         style={{ border: 'none' }}
                     >
-                        <ShowUserInfo type="sm" size={10} name={user.nickname} color={user.color} avatarUrl={user.avatar} />
+                        <ShowUserInfo type="sm" size={10} user={user} />
                     </Badge>
                 )}
             </div>
@@ -262,7 +259,7 @@ export const HandCard = ({
                     placement="top-right"
                     style={{ border: 'none' }}
                 >
-                    <ShowUserInfo type="sm" size={10} name={user.nickname} color={user.color} avatarUrl={user.avatar} />
+                    <ShowUserInfo type="sm" size={10} user={user} />
                 </Badge>
             )}
         </div>

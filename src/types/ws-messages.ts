@@ -1,24 +1,18 @@
 import type {
     WSMessageBase,
     UserInfo,
-    RoomData,
-    ChatMessage,
-    PlayerGameState,
-    RoomStatus,
+    RoomInfo,
+    SendChatMessage, PlayerInfo, PlayerLatency, ReceiveChatMessage,
 } from './base';
-import type { WSErrorCode } from './enums';
-import type { GameStage, CardType } from './enums';
-import type { ScoreCard, GameState } from './game';
+import type {RoomStatus, WSErrorCode} from './enums';
+import type { GameStage } from './enums';
+import type { PointCard, GameState } from './game';
 
-// ==================== 客户端 → 服务端消息 ====================
+// 客户端 → 服务端消息
 
 export interface UserUpdateMessage extends WSMessageBase {
     type: 'user.update';
-    payload: {
-        nickname?: string;
-        avatar?: string;
-        background?: string;
-    };
+    payload: UserInfo;
 }
 
 export interface RoomCreateMessage extends WSMessageBase {
@@ -43,21 +37,11 @@ export interface RoomLeaveMessage extends WSMessageBase {
     payload: Record<string, never>;
 }
 
-export interface RoomListMessage extends WSMessageBase {
-    type: 'room.list';
-    payload: Record<string, never>;
-}
-
 export interface GameReadyMessage extends WSMessageBase {
     type: 'game.ready';
     payload: {
         ready: boolean;
     };
-}
-
-export interface GameStageRequestMessage extends WSMessageBase {
-    type: 'game.stage';
-    payload: Record<string, never>;
 }
 
 export interface GameActionMessage extends WSMessageBase {
@@ -71,14 +55,27 @@ export interface GameActionMessage extends WSMessageBase {
 
 export interface ChatSendMessage extends WSMessageBase {
     type: 'chat.send';
+    payload: SendChatMessage;
+}
+
+export interface ServerPongMessage extends WSMessageBase {
+    type: 'client.pong';
     payload: {
-        message: string;
+        clientTime: number;
     };
 }
 
-// ==================== 服务端 → 客户端消息 ====================
+// 服务端 → 客户端消息
 
-export interface ServerInfoMessage {
+export interface ServerPingMessage extends WSMessageBase {
+    type: 'server.ping';
+    payload: {
+        serverTime: number;
+        latencies?: PlayerLatency[];
+    };
+}
+
+export interface ServerInfoMessage extends WSMessageBase {
     type: 'server.info';
     payload: {
         service: string;
@@ -89,6 +86,9 @@ export interface ServerInfoMessage {
 
 export interface ServerAckMessage extends WSMessageBase {
     type: 'server.ack';
+    payload: {
+        requestId: string;
+    };
 }
 
 export interface ServerErrorMessage extends WSMessageBase {
@@ -100,106 +100,100 @@ export interface ServerErrorMessage extends WSMessageBase {
     };
 }
 
-export interface RoomUpdateMessage {
+export interface RoomUpdateMessage extends WSMessageBase {
     type: 'room.update';
     payload: {
-        room: RoomData;
+        room: RoomInfo;
     };
 }
 
-export interface RoomListResponseMessage {
+export interface RoomListMessage extends WSMessageBase {
     type: 'room.list';
     payload: {
         rooms: Array<{
             roomId: string;
-            players: PlayerGameState[];
+            players: PlayerInfo[];
             status: RoomStatus;
             maxPlayers: number;
         }>;
     };
 }
 
-export interface GameStartMessage {
+export interface GameStartMessage extends WSMessageBase {
     type: 'game.start';
     payload: {
-        players: Array<{ playerId: string; name: string }>;
+        players: PlayerInfo[];
         state: GameState;
     };
 }
 
-export interface GameStageResponseMessage {
-    type: 'game.stage';
+export interface GameStateMessage extends WSMessageBase {
+    type: 'game.state';
     payload: {
-        stage: GameStage;
-        round: number;
-        scoreCard: ScoreCard;
-        carriedOver: ScoreCard[];
+        players: PlayerInfo[];
         state: GameState;
     };
 }
 
-export interface GameSyncMessage {
+export interface GameSyncMessage extends WSMessageBase {
     type: 'game.sync';
     payload: {
         action: {
-            playerId: string;
-            actionId: string;
-            actionType: string;
+            player: PlayerInfo;
             card: number;
         };
-        state: GameState;
     };
 }
 
-export interface GameResolveMessage {
+export interface GameResolveMessage extends WSMessageBase {
     type: 'game.resolve';
     payload: {
-        round: number;
-        playedCards: Array<{ playerId: string; card: number }>;
-        winnerId: string;
-        scoreCard: ScoreCard;
-        carriedOver: ScoreCard[];
-        playerPoints: Array<{ playerId: string; points: number[]; total: number }>;
+        players: PlayerInfo[];
         state: GameState;
     };
 }
 
-export interface GameEndMessage {
+export interface GameEndMessage extends WSMessageBase {
     type: 'game.end';
     payload: {
-        winnerId: string;
-        rankings: Array<{ playerId: string; total: number }>;
-        playerPoints: Array<{ playerId: string; points: number[]; total: number }>;
+        winnerId?: string;
+        rankings?: Array<{
+            playerId: string
+            total: number
+        }>;
+        playerPoints: Array<{
+            playerId: string
+            points: number[]
+            total: number
+        }>;
+        players: PlayerInfo[];
         state: GameState;
     };
 }
 
-export interface ChatReceiveMessage {
+export interface ChatReceiveMessage extends WSMessageBase {
     type: 'chat.receive';
-    payload: {
-        userId: string;
-        message: string;
-        timestamp: number;
-    };
+    payload: ReceiveChatMessage;
 }
 
-export interface ChatSyncMessage {
+export interface ChatSyncMessage extends WSMessageBase {
     type: 'chat.sync';
     payload: {
-        messages: ChatMessage[];
+        messages: ReceiveChatMessage[];
     };
 }
 
-// ==================== 消息类型联合 ====================
+// 消息类型联合
 
 export type ServerMessage =
+    | ServerPingMessage
     | ServerInfoMessage
     | ServerAckMessage
     | ServerErrorMessage
     | RoomUpdateMessage
-    | RoomListResponseMessage
+    | RoomListMessage
     | GameStartMessage
-    | GameStageResponseMessage
+    | GameStateMessage
     | GameSyncMessage
     | GameResolveMessage
     | GameEndMessage
@@ -213,8 +207,9 @@ export type ClientMessage =
     | RoomLeaveMessage
     | RoomListMessage
     | GameReadyMessage
-    | GameStageRequestMessage
+    | GameStateMessage
     | GameActionMessage
-    | ChatSendMessage;
+    | ChatSendMessage
+    | ServerPongMessage;
 
 export type WSMessage = ServerMessage | ClientMessage;

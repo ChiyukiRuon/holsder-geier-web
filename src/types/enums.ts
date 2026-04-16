@@ -23,6 +23,3 @@ export type GameStage = 'idle' | 'reveal' | 'play' | 'resolve' | 'end';
 
 // 房间状态
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
-
-// 卡牌类型
-export type CardType = 'meerkat' | 'vulture' | 'snake' | 'swan' | 'seal' | 'fox';
