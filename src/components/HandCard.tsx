@@ -10,18 +10,20 @@ interface HandCardProps {
     user: UserInfo;
     showBadge?: boolean;
     cardFace: "front" | "back" | "waiting";
+    enableHover?: boolean;
     onClick?: () => void;
 }
 
 export const HandCard = ({
-    value = null,
-    isSelected,
-    isDisabled,
-    user,
-    showBadge = false,
-    cardFace = "front",
-    onClick,
-}: HandCardProps) => {
+                             value = null,
+                             isSelected,
+                             isDisabled,
+                             user,
+                             showBadge = false,
+                             cardFace = "front",
+                             enableHover = true,
+                             onClick,
+                         }: HandCardProps) => {
     if (cardFace === "back") {
         return (
             <div
@@ -175,13 +177,13 @@ export const HandCard = ({
     return (
         <div
             onClick={!isDisabled ? onClick : undefined}
-            className={`
-                relative w-28 h-40 select-none transition-all duration-300 ease-out cursor-pointer
+            className={`                relative w-28 h-40 select-none transition-all duration-300 ease-out cursor-pointer
                 ${isSelected
-                        ? "-translate-y-12"
-                        : "hover:-translate-y-6 hover:scale-105 active:scale-95"
-                }
-            `}
+                ? "-translate-y-12"
+                : enableHover
+                    ? "hover:-translate-y-6 hover:scale-105 active:scale-95"
+                    : ""
+            }            `}
         >
             {/* 厚度层 */}
             {/*<div*/}

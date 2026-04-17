@@ -130,7 +130,7 @@ export default function ShowUserInfo({
 
                 {/* 网络状态 */}
                 <div className="flex flex-col items-end gap-1">
-                    {latency < 0 ? (
+                    {latency === -999 ? (
                         <div
                             className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">
                             <LinkSlash size={14}/>

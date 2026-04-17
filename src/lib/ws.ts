@@ -4,15 +4,7 @@ import type {
     WSMessage,
     WSEventHandler,
     WSConnectionOptions,
-    UserUpdateMessage,
-    RoomCreateMessage,
-    RoomJoinMessage,
-    RoomLeaveMessage,
-    RoomListMessage,
-    GameReadyMessage,
-    GameStateMessage,
-    GameActionMessage,
-    ChatSendMessage, WSRequestMap,
+    WSRequestMap,
 } from '@/types';
 
 class WebSocketManager {
@@ -202,11 +194,11 @@ class WebSocketManager {
     /**
      * 游戏操作
      */
-    sendGameAction(actionId: string, actionType: string, data: { card: number }) {
+    sendGameAction(card: number) {
         return this.sendWithAck({
             type: 'game.action',
             requestId: this.generateRequestId(),
-            payload: {actionId, actionType, data},
+            payload: {action: {card}},
         });
     }
 

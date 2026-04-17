@@ -25,4 +25,5 @@ export interface WSRequestMap {
     'game.action': { actionId: string; actionType: string; data: { card: number } };
     'chat.send': SendChatMessage;
     'client.pong': { clientTime: number };
+    'server.info': Record<string, never>;
 }

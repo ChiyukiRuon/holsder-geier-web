@@ -5,11 +5,9 @@ import type {
     SendChatMessage, PlayerInfo, PlayerLatency, ReceiveChatMessage,
 } from './base';
 import type {RoomStatus, WSErrorCode} from './enums';
-import type { GameStage } from './enums';
-import type { PointCard, GameState } from './game';
+import type { GameState } from './game';
 
 // 客户端 → 服务端消息
-
 export interface UserUpdateMessage extends WSMessageBase {
     type: 'user.update';
     payload: UserInfo;
@@ -47,9 +45,9 @@ export interface GameReadyMessage extends WSMessageBase {
 export interface GameActionMessage extends WSMessageBase {
     type: 'game.action';
     payload: {
-        actionId: string;
-        actionType: string;
-        data: { card: number };
+        action: {
+            card: number
+        }
     };
 }
 
@@ -66,7 +64,6 @@ export interface ServerPongMessage extends WSMessageBase {
 }
 
 // 服务端 → 客户端消息
-
 export interface ServerPingMessage extends WSMessageBase {
     type: 'server.ping';
     payload: {
@@ -81,6 +78,7 @@ export interface ServerInfoMessage extends WSMessageBase {
         service: string;
         version: string;
         environment: string;
+        serverTime: number;
     };
 }
 
@@ -135,6 +133,15 @@ export interface GameStateMessage extends WSMessageBase {
     };
 }
 
+export interface GameResolveMessage extends WSMessageBase {
+    type: 'game.resolve';
+    payload: {
+        players: PlayerInfo[];
+        state: GameState;
+        roundWinner: PlayerInfo | null;
+    };
+}
+
 export interface GameSyncMessage extends WSMessageBase {
     type: 'game.sync';
     payload: {
@@ -142,14 +149,6 @@ export interface GameSyncMessage extends WSMessageBase {
             player: PlayerInfo;
             card: number;
         };
-    };
-}
-
-export interface GameResolveMessage extends WSMessageBase {
-    type: 'game.resolve';
-    payload: {
-        players: PlayerInfo[];
-        state: GameState;
     };
 }
 
@@ -194,8 +193,8 @@ export type ServerMessage =
     | RoomListMessage
     | GameStartMessage
     | GameStateMessage
-    | GameSyncMessage
     | GameResolveMessage
+    | GameSyncMessage
     | GameEndMessage
     | ChatReceiveMessage
     | ChatSyncMessage;

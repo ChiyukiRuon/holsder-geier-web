@@ -102,3 +102,10 @@ export interface UploadResponse {
     size: number;
     mimetype: string;
 }
+
+export interface ServerInfo {
+    service: string;
+    version: string;
+    environment: string;
+    serverTime: number;
+}

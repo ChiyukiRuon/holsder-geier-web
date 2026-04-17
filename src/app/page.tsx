@@ -1,5 +1,6 @@
 'use client';
 
+import packageJson from "../../package.json";
 import {Badge, Button, Input, Popover, ScrollShadow, toast} from "@heroui/react";
 import ShowUserInfo from "@/components/ShowUserInfo";
 import {EditUserInfo} from "@/components/EditUserInfo";
@@ -12,40 +13,16 @@ import {
     UserInfo,
     GameSyncMessage,
     GameState,
-    SendChatMessage,
     ServerErrorMessage, PlayerLatency, ServerPingMessage,
-    PointCard as PointCardType, GameStartMessage, GameStateMessage, GameEndMessage, GameResolveMessage, ChatSyncMessage,
-    ChatReceiveMessage, ReceiveChatMessage
+    GameStartMessage, GameStateMessage, GameEndMessage, ChatSyncMessage,
+    ChatReceiveMessage, ReceiveChatMessage, GameResolveMessage, ServerInfo, ServerInfoMessage
 } from "@/types";
 import PointCard from "@/components/PointCard";
 import {useEffect, useRef, useState} from "react";
 import {generateNickname, generateUserColor} from "@/utils/user";
 import {useWebSocket} from "@/hooks/useWebSocket";
 import {ChatMessageItem} from "@/components/ChatMessageItem";
-
-// 本轮出牌区数据（当前回合各玩家的出牌）
-const currentRoundPlays: Array<{ user: UserInfo; card: number }> = [
-    {
-        user: {
-            userId: "p1",
-            nickname: "千雪琉音",
-            avatar: "https://chiyukiruon.com/avatar_01.png",
-            color: "#6366f1",
-            background: "https://image.tmdb.org/t/p/original/gcZJrVx0tNQbt5R0mhXRqRdAZ4l.jpg"
-        }, card: 5
-    },
-    {user: {userId: "p2", nickname: "ChiyukiRuon", avatar: "", color: "#10b981", background: ""}, card: 3},
-    {user: {userId: "p3", nickname: "ちゆき琉音", avatar: "", color: "#f59e0b", background: ""}, card: 8},
-    {user: {userId: "p4", nickname: "Diana", avatar: "", color: "#ec4899", background: ""}, card: 2},
-];
-
-// 弃牌区数据（上一轮各个玩家出的单张牌）
-const lastRoundDiscard: Array<{ user: UserInfo; card: number }> = [
-    {user: {userId: "p1", nickname: "Alice", color: "#6366f1", avatar: "", background: ""}, card: 5},
-    {user: {userId: "p2", nickname: "Bob", color: "#10b981", avatar: "", background: ""}, card: 3},
-    {user: {userId: "p3", nickname: "Charlie", color: "#f59e0b", avatar: "", background: ""}, card: 8},
-    {user: {userId: "p4", nickname: "Diana", color: "#ec4899", avatar: "", background: ""}, card: 2},
-];
+import {getGameStageName} from "@/utils/game";
 
 function PointDeckBack({count}: { count: number }) {
     return (
@@ -74,16 +51,20 @@ function PointDeckBack({count}: { count: number }) {
     );
 }
 
-function PointCardStack({values}: { values: number[] }) {
+function PointCardStack({cards}: {cards: number[]}) {
+    const filteredCards = cards.filter(card => card !== 0);
+
+    if (!filteredCards || filteredCards.length === 0) return null;
+
     return (
         <div
             className="relative flex items-center"
             style={{
-                width: 112 + (values.length - 1) * 32,
+                width: 112 + (filteredCards.length - 1) * 32,
                 height: 168
             }}
         >
-            {values.map((v, i) => (
+            {filteredCards.map((v, i) => (
                 <div
                     key={i}
                     className="absolute transition-all duration-300 ease-out hover:-translate-y-4 hover:z-50 cursor-pointer"
@@ -118,12 +99,10 @@ export default function GameRoom() {
     const [roomChatMessages, setRoomChatMessages] = useState<ReceiveChatMessage[]>([]);
 
     const [gameState, setGameState] = useState<GameState | null>(null);
-    const [playedCards, setPlayedCards] = useState<Array<{ playerId: string; card: number | null }>>([]);
-    const [lastPlayedCards, setLastPlayedCards] = useState<Array<{ playerId: string; card: number | null }>>([]);
+    const [roundWinner, setRoundWinner] = useState<PlayerInfo | null>(null);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isInRoom, setIsInRoom] = useState(false);
-    const [isGameStarted, setIsGameStarted] = useState(false);
     const [isUserReady, setIsUserReady] = useState(false);
 
     const [isJoining, setIsJoining] = useState(false);
@@ -132,17 +111,64 @@ export default function GameRoom() {
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const shouldAutoScrollRef = useRef(true);
 
+    const commonEmojis = [
+        '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😜',
+        '🤔', '😎', '🥳', '😭', '😱', '🤯', '👍', '👎',
+        '👏', '🙏', '❤️', '🔥',  '🎉', '💯', '☝️🤓', '🤣👉',
+    ];
+
     const {
         isConnected,
+        serverInfo,
         subscribe,
         joinRoom,
         leaveRoom,
         setReady,
+        sendGameAction,
         sendChatMessage,
         updateUser
     } = useWebSocket({
         autoConnect: true,
     });
+
+    const isGameStarted = (() => {
+        if (!gameState) return false;
+        return gameState.stage !== "idle" && gameState.stage !== "end";
+    })();
+
+    const playedCards = (() => {
+        if (!gameState) return players.map(player => ({
+            user: player.user,
+            card: null
+        }));
+
+        return players.map(player => {
+            const playedCard = gameState.playedCards.find(
+                item => item.playerId === player.user.userId
+            );
+            return {
+                user: player.user,
+                card: playedCard?.card ?? null
+            };
+        });
+    })();
+
+    const lastPlayedCards = (() => {
+        if (!gameState?.lastPlayedCards) return [];
+
+        // 按照 players 的顺序来构建 lastPlayedCards
+        return players
+            .map(player => {
+                const playedCard = gameState.lastPlayedCards?.find(
+                    item => item.playerId === player.user.userId
+                );
+                return {
+                    user: player.user,
+                    card: playedCard?.card ?? null
+                };
+            })
+            .filter(item => item.card !== null);
+    })();
 
     // 初始化玩家信息
     useEffect(() => {
@@ -176,33 +202,76 @@ export default function GameRoom() {
             }),
 
             subscribe('server.error', (error: ServerErrorMessage["payload"]) => {
-                console.log('server error', error)
-                toast.danger(error.message)
+                console.log('server error', error);
+                toast.danger(error.message);
             }),
 
             subscribe('room.update', (data: RoomUpdateMessage["payload"]) => {
                 console.log('room update', data.room);
                 setPlayers(data.room.players);
+                setRoomInfo(data.room);
             }),
 
             subscribe('game.start', (data: GameStartMessage["payload"]) => {
                 console.log('game start', data);
-                setIsGameStarted(true)
                 setGameState(data.state);
+                setPlayers(data.players);
+                setIsUserReady(false);
             }),
-
-            subscribe('game.resolve', (data: GameResolveMessage["payload"]) => {}),
 
             subscribe('game.end', (data: GameEndMessage["payload"]) => {
                 console.log('game end', data);
-                setIsGameStarted(false)
+                setGameState(data.state);
+                setPlayers(data.players);
+                setIsUserReady(false);
+            }),
+
+            subscribe('game.resolve', (data: GameResolveMessage["payload"]) => {
+                console.log('game resolve', data);
+                setGameState(data.state);
+                setPlayers(data.players);
+                setRoundWinner(data.roundWinner);
+                setIsUserReady(false);
             }),
 
             subscribe('game.sync', (data: GameSyncMessage["payload"]) => {
                 console.log('game sync', data);
+
+                const { player, card } = data.action;
+
+                setGameState(prevState => {
+                    if (!prevState) return prevState;
+
+                    const updatedPlayedCards = [...prevState.playedCards];
+                    const existingIndex = updatedPlayedCards.findIndex(
+                        item => item.playerId === player.user.userId
+                    );
+
+                    if (existingIndex >= 0) {
+                        updatedPlayedCards[existingIndex] = { playerId: player.user.userId, card };
+                    } else {
+                        updatedPlayedCards.push({ playerId: player.user.userId, card });
+                    }
+
+                    return {
+                        ...prevState,
+                        playedCards: updatedPlayedCards
+                    };
+                });
+
+                setPlayers(prevPlayers =>
+                    prevPlayers.map(p =>
+                        p.user.userId === player.user.userId ? player : p
+                    )
+                );
             }),
 
-            subscribe('game.state', (data: GameStateMessage["payload"]) => {}),
+            subscribe('game.state', (data: GameStateMessage["payload"]) => {
+                console.log('game state', data);
+                setGameState(data.state);
+                setPlayers(data.players);
+                setRoundWinner(null);
+            }),
 
             subscribe('chat.receive', (msg: ChatReceiveMessage["payload"]) => {
                 console.log('chat', msg);
@@ -211,7 +280,7 @@ export default function GameRoom() {
 
             subscribe('chat.sync', (data: ChatSyncMessage["payload"]) => {
                 setRoomChatMessages(data.messages);
-            })
+            }),
         ];
 
         return () => {
@@ -228,7 +297,17 @@ export default function GameRoom() {
 
     useEffect(() => {
 
-    }, [gameState]);
+    }, [gameState])
+
+    useEffect(() => {
+        if (shouldAutoScrollRef.current && chatContainerRef.current) {
+            const scrollContainer = chatContainerRef.current.querySelector('[data-slot="scroll-shadow-viewport"]') ||
+                chatContainerRef.current;
+            setTimeout(() => {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }, 100);
+        }
+    }, [roomChatMessages]);
 
     const updateUserInfo = <K extends keyof UserInfo>(
         key: K,
@@ -243,7 +322,12 @@ export default function GameRoom() {
             };
 
             localStorage.setItem("userInfo", JSON.stringify(updated));
-            updateUser(updated);
+            updateUser(updated).then(() => {
+
+            }).catch(err => {
+                console.error('update user error', err);
+                toast.danger(`更新用户信息失败: ${err.message}`, {timeout: 5000})
+            });
 
             console.log('updateUserInfo', updated);
 
@@ -270,6 +354,7 @@ export default function GameRoom() {
         leaveRoom().then(() => {
             toast.success('已离开房间');
             setIsInRoom(false);
+            setIsUserReady(false);
             setPlayers([]);
             setRoomId("");
             setRoomInfo(null);
@@ -290,6 +375,35 @@ export default function GameRoom() {
         });
     };
 
+    const handleCardPlay = (card: number) => {
+        sendGameAction(card).then(() => {
+            console.log('send game action', card);
+
+            setGameState(prevState => {
+                if (!prevState) return prevState;
+
+                const updatedPlayedCards = [...prevState.playedCards];
+                const existingIndex = updatedPlayedCards.findIndex(
+                    item => item.playerId === userInfo.userId
+                );
+
+                if (existingIndex >= 0) {
+                    updatedPlayedCards[existingIndex] = { playerId: userInfo.userId, card };
+                } else {
+                    updatedPlayedCards.push({ playerId: userInfo.userId, card });
+                }
+
+                return {
+                    ...prevState,
+                    playedCards: updatedPlayedCards
+                };
+            });
+        }).catch(err => {
+            console.error('send game action error', err);
+            toast.danger(`出现错误: ${err.message}`, {timeout: 5000})
+        });
+    };
+
     const handleSendChatMessage = (message: string) => {
         if (!message.trim()) return;
         sendChatMessage(message, userInfo).then(() => {
@@ -305,22 +419,6 @@ export default function GameRoom() {
         handleSendChatMessage(emoji);
         setEmojiPickerOpen(false);
     };
-
-    const commonEmojis = [
-        '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😜',
-        '🤔', '😎', '🥳', '😭', '😱', '🤯', '👍', '👎',
-        '👏', '🙏', '❤️', '🔥',  '🎉', '💯', '☝️🤓', '🤣👉',
-    ];
-
-    useEffect(() => {
-        if (shouldAutoScrollRef.current && chatContainerRef.current) {
-            const scrollContainer = chatContainerRef.current.querySelector('[data-slot="scroll-shadow-viewport"]') ||
-                chatContainerRef.current;
-            setTimeout(() => {
-                scrollContainer.scrollTop = scrollContainer.scrollHeight;
-            }, 100);
-        }
-    }, [roomChatMessages]);
 
     return (
         <div className="h-screen w-full bg-slate-300 p-6 grid grid-cols-12 gap-6 overflow-hidden relative">
@@ -353,7 +451,7 @@ export default function GameRoom() {
                             </span>
                         </div>
                         <div className="flex gap-4">
-                            <div className="text-amber-400 font-mono text-sm font-black">ROUND {gameState?.currentRound ?? 0}</div>
+                            <div className="text-amber-400 font-mono text-sm font-black">ROUND {gameState?.currentRound ?? 0} - {getGameStageName(gameState?.stage)}</div>
                         </div>
                     </div>
 
@@ -373,13 +471,18 @@ export default function GameRoom() {
 
                                 <div className="relative z-10 flex items-center gap-20">
                                     <div className="flex flex-col items-center gap-3">
-                                        <PointDeckBack count={gameState?.currentPointCards.length ?? 15}/>
+                                        <PointDeckBack count={gameState ? 15 - gameState.currentRound : 15}/>
                                     </div>
 
                                     <div className="h-24 w-0.5 bg-slate-300/50"/>
 
                                     <div className="flex flex-col items-center gap-3">
-                                        <PointCardStack values={gameState?.currentPointCards.map(card => card.value) ?? []}/>
+                                        {(gameState?.carriedOverCards?.length || gameState?.currentPointCard) && (
+                                            <PointCardStack cards={[
+                                                ...(gameState?.carriedOverCards || []),
+                                                gameState?.currentPointCard ?? 0
+                                            ]}/>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -391,12 +494,16 @@ export default function GameRoom() {
                                     Current
                                 </div>
                                 <div className="flex gap-6 items-center justify-center">
-                                    {currentRoundPlays.map((player) => (
-                                        <PlayAreaCard
-                                            key={player.user.userId}
-                                            user={player.user}
-                                            card={player.card}
-                                        />
+                                    {playedCards.map((player) => (
+                                        <div key={player.user.userId}
+                                             className="scale-75 opacity-80 hover:opacity-100 transition-opacity">
+                                            <PlayAreaCard
+                                                user={player.user}
+                                                cardFace={"front"}
+                                                card={player.card ?? undefined}
+                                                isHighlighted={roundWinner?.user.userId === player.user.userId && gameState?.stage === 'resolve'}
+                                            />
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -411,13 +518,14 @@ export default function GameRoom() {
                                 <div className="rounded-2xl bg-slate-200/30 border-2 border-dashed border-slate-300/50">
                                     <div
                                         className="px-6 py-4 flex items-center justify-center gap-8 overflow-x-auto min-h-25">
-                                        {lastRoundDiscard.length > 0 ? (
-                                            lastRoundDiscard.map((player) => (
+                                        {lastPlayedCards.length > 0 ? (
+                                            lastPlayedCards.map((player) => (
                                                 <div key={player.user.userId}
                                                      className="scale-75 opacity-80 hover:opacity-100 transition-opacity">
                                                     <PlayAreaCard
                                                         user={player.user}
-                                                        card={player.card}
+                                                        cardFace={"front"}
+                                                        card={player.card ?? undefined}
                                                     />
                                                 </div>
                                             ))
@@ -439,8 +547,9 @@ export default function GameRoom() {
                                 (
                                     <div className="h-full flex items-end justify-center">
                                         <DynamicHand
-                                            cards={[]}
+                                            cards={players.find(p => p.user.userId === userInfo.userId)?.card ?? []}
                                             user={userInfo}
+                                            onCardPlay={(card) => handleCardPlay(card)}
                                         />
                                     </div>
                                 ) : (
@@ -598,13 +707,14 @@ export default function GameRoom() {
                                     type={"lg"}
                                     player={{
                                         user: userInfo,
-                                        latency: 0,
+                                        latency: playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0,
                                         ready: false,
                                         card: [],
-                                        point: {count: 0, list: []},
+                                        point: players.find((p) => p.user.userId === userInfo.userId)?.point || { count: 0, list: [] },
                                         currentPlayerCard: undefined,
                                         lastPlayerCard: undefined
-                                    }} latency={0}
+                                    }}
+                                    latency={players.find((p) => p.user.userId === userInfo.userId)?.latency || 0}
                                     showEditButton={true}
                                     onEdit={() => {
                                         setIsEditModalOpen(true);
@@ -754,11 +864,15 @@ export default function GameRoom() {
 
                 {/* 4. 底部品牌/版本标识 */}
                 <div className="flex items-center justify-between px-2 opacity-40">
-                    <span className="text-[10px] font-black italic text-slate-600">CARD_ENGINE_PRO_v2</span>
+                    <a href="https://github.com/ChiyukiRuon/holsder-geier-web" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                    </a>
                     <div className="flex gap-2 text-[10px] font-bold text-slate-600 uppercase">
-                        <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+                        <span>{isConnected ? serverInfo ? `SERVER ${serverInfo.version}`: 'Connected' : 'Disconnected'}</span>
                         <span>|</span>
-                        <span>Ver: 0.4.2</span>
+                        <span>Client {packageJson.version}</span>
                     </div>
                 </div>
             </div>

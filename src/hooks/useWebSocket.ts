@@ -1,7 +1,6 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import { wsManager } from '@/lib/ws';
-import type { ServerMessage, UserInfo } from '@/types';
-import {userInfo} from "os";
+import type {ServerInfo, ServerMessage, UserInfo} from '@/types';
 
 /**
  * 使用 WebSocket 连接的 Hook
@@ -13,15 +12,33 @@ export function useWebSocket(options: {
 }) {
     const [isConnected, setIsConnected] = useState(false);
     const [lastMessage, setLastMessage] = useState<ServerMessage | null>(null);
+    const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null)
+    const isConnectingRef = useRef(false);
 
     const { autoConnect = true } = options;
 
     // 连接 WebSocket
     const connect = useCallback(() => {
+        if (isConnectingRef.current || wsManager.isConnected()) {
+            return;
+        }
+
+        isConnectingRef.current = true;
         wsManager.connect({
-            onOpen: () => setIsConnected(true),
-            onClose: () => setIsConnected(false),
-            onMessage: (message) => setLastMessage(message as ServerMessage),
+            onOpen: () => {
+                setIsConnected(true);
+                isConnectingRef.current = false;
+            },
+            onClose: () => {
+                setIsConnected(false);
+                isConnectingRef.current = false;
+            },
+            onMessage: (message) => {
+                if (message.type === 'server.info') {
+                    setServerInfo(message.payload)
+                }
+                setLastMessage(message as ServerMessage)
+            },
         });
     }, []);
 
@@ -29,10 +46,11 @@ export function useWebSocket(options: {
     const disconnect = useCallback(() => {
         wsManager.disconnect();
         setIsConnected(false);
+        isConnectingRef.current = false;
     }, []);
 
     useEffect(() => {
-        if (autoConnect && !wsManager.isConnected()) {
+        if (autoConnect && !wsManager.isConnected() && !isConnectingRef.current) {
             connect();
         }
 
@@ -77,8 +95,8 @@ export function useWebSocket(options: {
     }, []);
 
     // 发送游戏动作
-    const sendGameAction = useCallback((actionId: string, actionType: string, data: { card: number }) => {
-        return wsManager.sendGameAction(actionId, actionType, data);
+    const sendGameAction = useCallback((card: number) => {
+        return wsManager.sendGameAction(card);
     }, []);
 
     // 发送聊天消息
@@ -89,6 +107,7 @@ export function useWebSocket(options: {
     return {
         isConnected,
         lastMessage,
+        serverInfo,
         connect,
         disconnect,
         subscribe,
