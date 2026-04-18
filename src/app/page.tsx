@@ -1,7 +1,7 @@
 'use client';
 
 import packageJson from "../../package.json";
-import {Badge, Button, Input, Popover, ScrollShadow, Spinner, toast} from "@heroui/react";
+import {Badge, Button, Input, Modal, Popover, ScrollShadow, Spinner, toast} from "@heroui/react";
 import ShowUserInfo from "@/components/ShowUserInfo";
 import {EditUserInfo} from "@/components/EditUserInfo";
 import {DynamicHand} from "@/components/DynamicHand";
@@ -59,7 +59,7 @@ function PointDeckBack({count}: { count: number }) {
     );
 }
 
-function PointCardStack({cards}: {cards: number[]}) {
+function PointCardStack({cards}: { cards: number[] }) {
     const filteredCards = cards.filter(card => card !== 0);
 
     if (!filteredCards || filteredCards.length === 0) return null;
@@ -105,10 +105,12 @@ function GameRoomContent() {
 
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [roundWinner, setRoundWinner] = useState<PlayerInfo | null>(null);
+    const [gameEndData, setGameEndData] = useState<GameEndMessage["payload"] | null>(null);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isInRoom, setIsInRoom] = useState(false);
     const [isUserReady, setIsUserReady] = useState(false);
+    const [isGameEndModalOpen, setIsGameEndModalOpen] = useState(false);
 
     const [isJoining, setIsJoining] = useState(false);
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -119,7 +121,7 @@ function GameRoomContent() {
     const commonEmojis = [
         '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😜',
         '🤔', '😎', '🥳', '😭', '😱', '🤯', '👍', '👎',
-        '👏', '🙏', '❤️', '🔥',  '🎉', '💯', '☝️🤓', '🤣👉',
+        '👏', '🙏', '❤️', '🔥', '🎉', '💯', '☝️🤓', '🤣👉',
     ];
 
     const {
@@ -254,6 +256,9 @@ function GameRoomContent() {
                 setGameState(data.state);
                 setPlayers(data.players);
                 setIsUserReady(false);
+                setRoundWinner(null);
+                setIsGameEndModalOpen(false);
+                setGameEndData(null)
             }),
 
             subscribe('game.end', (data: GameEndMessage["payload"]) => {
@@ -261,6 +266,8 @@ function GameRoomContent() {
                 setGameState(data.state);
                 setPlayers(data.players);
                 setIsUserReady(false);
+                setGameEndData(data);
+                setIsGameEndModalOpen(true);
             }),
 
             subscribe('game.resolve', (data: GameResolveMessage["payload"]) => {
@@ -274,7 +281,7 @@ function GameRoomContent() {
             subscribe('game.sync', (data: GameSyncMessage["payload"]) => {
                 console.log('game sync', data);
 
-                const { player, card } = data.action;
+                const {player, card} = data.action;
 
                 setGameState(prevState => {
                     if (!prevState) return prevState;
@@ -285,9 +292,9 @@ function GameRoomContent() {
                     );
 
                     if (existingIndex >= 0) {
-                        updatedPlayedCards[existingIndex] = { playerId: player.user.userId, card };
+                        updatedPlayedCards[existingIndex] = {playerId: player.user.userId, card};
                     } else {
-                        updatedPlayedCards.push({ playerId: player.user.userId, card });
+                        updatedPlayedCards.push({playerId: player.user.userId, card});
                     }
 
                     return {
@@ -427,9 +434,9 @@ function GameRoomContent() {
                 );
 
                 if (existingIndex >= 0) {
-                    updatedPlayedCards[existingIndex] = { playerId: userInfo.userId, card };
+                    updatedPlayedCards[existingIndex] = {playerId: userInfo.userId, card};
                 } else {
-                    updatedPlayedCards.push({ playerId: userInfo.userId, card });
+                    updatedPlayedCards.push({playerId: userInfo.userId, card});
                 }
 
                 return {
@@ -460,12 +467,12 @@ function GameRoomContent() {
     };
 
     return (
-        <div className="h-screen w-full bg-slate-300 p-6 grid grid-cols-12 gap-6 overflow-hidden relative">
+        <div
+            className="h-screen w-full bg-slate-300 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 overflow-hidden relative">
 
             {/* 1. 背景纹理与装饰 */}
             <div className="absolute inset-0 pointer-events-none opacity-20"
                  style={{
-                     // backgroundImage: 'radial-gradient(#000 1.5px, transparent 0)',
                      backgroundSize: '32px 32px'
                  }}
             />
@@ -473,69 +480,76 @@ function GameRoomContent() {
                 className="absolute inset-0 pointer-events-none bg-linear-to-b from-transparent via-transparent to-black/5"/>
 
             {/* 游戏区域 */}
-            <div className="col-span-9 flex flex-col relative group">
-                {/* 边框装饰 */}
-                <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-slate-800 z-10"/>
-                <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-slate-800 z-10"/>
+            <div className="col-span-1 lg:col-span-9 flex flex-col relative group order-1 lg:order-0">
+                {/* 边框装饰 - 仅在大屏显示 */}
+                <div
+                    className="hidden lg:block absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-slate-800 z-10"/>
+                <div
+                    className="hidden lg:block absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-slate-800 z-10"/>
 
                 <div
-                    className="flex-1 bg-slate-100/80 backdrop-blur-sm border-4 border-slate-800 rounded-2xl shadow-[10px_10px_0px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col">
+                    className="flex-1 bg-slate-100/80 backdrop-blur-sm border-4 border-slate-800 rounded-2xl shadow-[10px_10px_0px_rgba(0,0,0,0.15)] lg:shadow-[10px_10px_0px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col">
                     {/* 游戏区顶部状态栏 */}
-                    <div className="h-12 bg-slate-800 flex items-center justify-between px-6">
-                        <div className="flex items-center gap-3">
+                    <div className="h-10 md:h-12 bg-slate-800 flex items-center justify-between px-4 md:px-6">
+                        <div className="flex items-center gap-2 md:gap-3">
                             <div
                                 className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}/>
-                            <span className="text-white text-xs font-black tracking-widest uppercase italic">
+                            <span
+                                className="text-white text-[10px] md:text-xs font-black tracking-widest uppercase italic">
                                 Room{roomId ? `#${roomId}` : ''}
                             </span>
                         </div>
-                        <div className="flex gap-4">
-                            <div className="text-amber-400 font-mono text-sm font-black">ROUND {gameState?.currentRound ?? 0} - {getGameStageName(gameState?.stage)}</div>
+                        <div className="flex gap-2 md:gap-4">
+                            <div
+                                className="text-amber-400 font-mono text-xs md:text-sm font-black">ROUND {gameState?.currentRound ?? 0} - {getGameStageName(gameState?.stage)}</div>
                         </div>
                     </div>
 
                     {/* 主画布区域 */}
-                    <div className="flex-1 h-full flex flex-col gap-4 p-8 overflow-hidden">
+                    <div className="flex-1 h-full flex flex-col gap-3 md:gap-4 p-4 md:p-8 overflow-hidden">
 
                         {/* 桌面区 */}
-                        <div className="flex-1 flex flex-col gap-6 min-h-0">
+                        <div className="flex-1 flex flex-col gap-4 md:gap-6 min-h-0">
                             {/* 得分牌展示区 */}
                             <div
-                                className="flex flex-col items-center justify-center gap-20 py-8 px-12 rounded-3xl bg-slate-50/40 backdrop-blur-sm border-2 border-slate-200/60 shadow-inner relative">
+                                className="flex flex-col items-center justify-center gap-10 md:gap-20 py-4 md:py-8 px-6 md:px-12 rounded-3xl bg-slate-50/40 backdrop-blur-sm border-2 border-slate-200/60 shadow-inner relative">
                                 {/* 背景水印 */}
                                 <div
-                                    className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none text-8xl font-black">
+                                    className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none text-4xl md:text-8xl font-black">
                                     BOARD
                                 </div>
 
-                                <div className="relative z-10 flex items-center gap-20">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <PointDeckBack count={gameState ? 15 - gameState.currentRound : 15}/>
+                                <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 md:gap-20">
+                                    <div className="flex flex-col items-center gap-2 md:gap-3">
+                                        <PointDeckBack count={Math.max(gameState ? 15 - gameState.currentRound : 15, 0)}/>
                                     </div>
 
-                                    <div className="h-24 w-0.5 bg-slate-300/50"/>
+                                    <div className="hidden md:block h-24 w-0.5 bg-slate-300/50"/>
 
-                                    <div className="flex flex-col items-center gap-3">
+                                    <div className="flex flex-col items-center gap-2 md:gap-3">
                                         {(gameState?.carriedOverCards?.length || gameState?.currentPointCard) && (
-                                            <PointCardStack cards={[
-                                                ...(gameState?.carriedOverCards || []),
-                                                gameState?.currentPointCard ?? 0
-                                            ]}/>
+                                            <div className="transform scale-75 md:scale-100">
+                                                <PointCardStack cards={[
+                                                    ...(gameState?.carriedOverCards || []),
+                                                    gameState?.currentPointCard ?? 0
+                                                ]}/>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
                             {/* 出牌区 */}
-                            <div className="flex-1 flex flex-col items-center justify-center relative min-h-45">
+                            <div
+                                className="flex-1 flex flex-col items-center justify-center relative min-h-32 md:min-h-45">
                                 <div
-                                    className="absolute top-0 text-[10px] font-black text-slate-400 tracking-[0.3em] uppercase">
+                                    className="absolute top-0 text-[8px] md:text-[10px] font-black text-slate-400 tracking-[0.3em] uppercase">
                                     Current
                                 </div>
-                                <div className="flex gap-6 items-center justify-center">
+                                <div className="flex gap-3 md:gap-6 items-center justify-center flex-wrap">
                                     {playedCards.map((player) => (
                                         <div key={player.user.userId}
-                                             className="scale-75 opacity-80 hover:opacity-100 transition-opacity">
+                                             className="scale-50 md:scale-75 opacity-80 hover:opacity-100 transition-opacity">
                                             <PlayAreaCard
                                                 user={player.user}
                                                 cardFace={"front"}
@@ -552,15 +566,15 @@ function GameRoomContent() {
                                 <div className="flex items-center gap-2 px-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-slate-400"/>
                                     <span
-                                        className="text-[10px] font-black text-slate-400 uppercase tracking-widest">History</span>
+                                        className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">History</span>
                                 </div>
                                 <div className="rounded-2xl bg-slate-200/30 border-2 border-dashed border-slate-300/50">
                                     <div
-                                        className="px-6 py-4 flex items-center justify-center gap-8 overflow-x-auto min-h-25">
+                                        className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-center gap-4 md:gap-8 overflow-x-auto min-h-20 md:min-h-25">
                                         {lastPlayedCards.length > 0 ? (
                                             lastPlayedCards.map((player) => (
                                                 <div key={player.user.userId}
-                                                     className="scale-75 opacity-80 hover:opacity-100 transition-opacity">
+                                                     className="scale-50 md:scale-75 opacity-80 hover:opacity-100 transition-opacity">
                                                     <PlayAreaCard
                                                         user={player.user}
                                                         cardFace={"front"}
@@ -569,7 +583,8 @@ function GameRoomContent() {
                                                 </div>
                                             ))
                                         ) : (
-                                            <span className="text-[10px] font-bold text-slate-300 italic uppercase">No cards discarded yet</span>
+                                            <span
+                                                className="text-[8px] md:text-[10px] font-bold text-slate-300 italic uppercase">No cards discarded yet</span>
                                         )}
                                     </div>
                                 </div>
@@ -577,7 +592,7 @@ function GameRoomContent() {
                         </div>
 
                         {/* 手牌区 */}
-                        <div className="h-48 flex-none relative z-50">
+                        <div className="h-36 md:h-48 flex-none relative z-50">
                             {/* 手牌区背景阴影 */}
                             <div
                                 className="absolute -inset-x-8 top-12 -bottom-8 bg-linear-to-t from-slate-900/10 to-transparent pointer-events-none"/>
@@ -600,14 +615,13 @@ function GameRoomContent() {
                                                     <Button
                                                         className="relative group transition-all duration-200 active:translate-y-1"
                                                         style={{
-                                                            height: '48px',
-                                                            padding: '0 40px',
-                                                            // 使用更具警示感但不刺眼的色调
+                                                            height: '40px',
+                                                            padding: '0 30px',
                                                             backgroundColor: '#f43f5e',
                                                             color: 'white',
-                                                            fontSize: '14px',
+                                                            fontSize: '12px',
                                                             fontWeight: '900',
-                                                            letterSpacing: '0.2em',
+                                                            letterSpacing: '0.15em',
                                                             borderRadius: '12px',
                                                             border: 'none',
                                                             boxShadow: '0 4px 0 0 #be123c, 0 8px 15px -5px rgba(244, 63, 94, 0.4)',
@@ -629,13 +643,13 @@ function GameRoomContent() {
                                                     <Button
                                                         className="relative group transition-all duration-200 active:translate-y-1"
                                                         style={{
-                                                            height: '48px',
-                                                            padding: '0 40px',
+                                                            height: '40px',
+                                                            padding: '0 30px',
                                                             backgroundColor: '#3b82f6',
                                                             color: 'white',
-                                                            fontSize: '14px',
+                                                            fontSize: '12px',
                                                             fontWeight: '900',
-                                                            letterSpacing: '0.2em',
+                                                            letterSpacing: '0.15em',
                                                             borderRadius: '12px',
                                                             border: 'none',
                                                             boxShadow: '0 4px 0 0 #2563eb, 0 8px 15px -5px rgba(59, 130, 246, 0.5)',
@@ -664,20 +678,22 @@ function GameRoomContent() {
             </div>
 
             {/* 控制面板与信息 */}
-            <div className="col-span-3 flex flex-col gap-6 h-full flex-1 min-h-0">
+            <div
+                className="col-span-1 lg:col-span-3 flex flex-col gap-4 md:gap-6 h-full flex-1 min-h-0 order-2 lg:order-0 max-h-[40vh] lg:max-h-none overflow-y-auto lg:overflow-visible">
 
                 {/* 房间控制区 */}
                 <div
-                    className="flex-none bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] p-4">
-                    <div className="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-tight">Room</div>
+                    className="flex-none bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] p-3 md:p-4">
+                    <div className="text-[10px] font-black text-slate-400 mb-2 md:mb-3 uppercase tracking-tight">Room
+                    </div>
 
                     {isInRoom ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2 md:space-y-3">
                             <div className="flex gap-2">
                                 <Button
                                     className="w-full font-black text-xs uppercase tracking-wider"
                                     style={{
-                                        height: '40px',
+                                        height: '36px',
                                         backgroundColor: '#3b82f6',
                                         color: 'white',
                                         border: '2px solid #2563eb',
@@ -697,7 +713,7 @@ function GameRoomContent() {
                                 <Button
                                     className="w-full font-black text-xs uppercase tracking-wider"
                                     style={{
-                                        height: '40px',
+                                        height: '36px',
                                         backgroundColor: '#ef4444',
                                         color: 'white',
                                         border: '2px solid #dc2626',
@@ -709,13 +725,13 @@ function GameRoomContent() {
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2 md:space-y-3">
                             <div className="flex gap-2">
                                 <Input
                                     placeholder="房间 ID"
                                     className="flex-1"
                                     style={{
-                                        height: '40px',
+                                        height: '36px',
                                     }}
                                     value={roomId}
                                     onChange={(e) => setRoomId(e.target.value)}
@@ -723,8 +739,8 @@ function GameRoomContent() {
                                 <Button
                                     className="font-black text-xs uppercase tracking-wider"
                                     style={{
-                                        height: '40px',
-                                        minWidth: '80px',
+                                        height: '36px',
+                                        minWidth: '70px',
                                         backgroundColor: '#3b82f6',
                                         color: 'white',
                                         border: '2px solid #2563eb',
@@ -733,7 +749,7 @@ function GameRoomContent() {
                                     isDisabled={!roomId.trim() || !isConnected}
                                     isPending={isJoining}
                                 >
-                                    {isJoining ? <Spinner color="current" size="sm" /> : null}
+                                    {isJoining ? <Spinner color="current" size="sm"/> : null}
                                     加入
                                 </Button>
                             </div>
@@ -743,11 +759,11 @@ function GameRoomContent() {
 
                 {/* 玩家状态面板*/}
                 <div
-                    className="bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] p-3 flex flex-col">
+                    className="bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] p-2 md:p-3 flex flex-col">
                     <div
                         className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tight shrink-0">Players
                     </div>
-                    <div className="flex-1 min-h-0 overflow-hidden">
+                    <div className="flex-1 min-h-0 overflow-hidden max-h-32 lg:max-h-none">
                         {userInfo && (
                             <div className="flex flex-col gap-1 h-full overflow-y-auto">
                                 <Badge.Anchor className={"m-1"}>
@@ -758,7 +774,10 @@ function GameRoomContent() {
                                             latency: playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0,
                                             ready: false,
                                             card: [],
-                                            point: players.find((p) => p.user.userId === userInfo.userId)?.point || { count: 0, list: [] },
+                                            point: players.find((p) => p.user.userId === userInfo.userId)?.point || {
+                                                count: 0,
+                                                list: []
+                                            },
                                             currentPlayerCard: undefined,
                                             lastPlayerCard: undefined
                                         }}
@@ -771,8 +790,10 @@ function GameRoomContent() {
                                     {isUserReady && (
                                         <Badge color={"success"} size={"sm"}>
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                 strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                                                 strokeWidth="1.5" stroke="currentColor" className="size-2.5"
+                                                 color={"white"}>
+                                                <path strokeLinecap="round" strokeLinejoin="round"
+                                                      d="m4.5 12.75 6 6 9-13.5"/>
                                             </svg>
                                         </Badge>
                                     )}
@@ -794,8 +815,10 @@ function GameRoomContent() {
                                                     onEdit={() => setIsEditModalOpen(true)}
                                                 />
                                                 {p.ready && <Badge color={"success"} size={"sm"}>
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                         strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                         viewBox="0 0 24 24"
+                                                         strokeWidth="1.5" stroke="currentColor" className="size-2.5"
+                                                         color={"white"}>
                                                         <path strokeLinecap="round" strokeLinejoin="round"
                                                               d="m4.5 12.75 6 6 9-13.5"/>
                                                     </svg>
@@ -814,7 +837,7 @@ function GameRoomContent() {
                     className="flex-1 flex flex-col min-h-0 bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] overflow-hidden">
                     {/* 聊天区域 */}
                     <div
-                        className="flex-none px-4 py-2 bg-slate-800 text-white flex items-center justify-between shadow-sm">
+                        className="flex-none px-3 md:px-4 py-2 bg-slate-800 text-white flex items-center justify-between shadow-sm">
                         <div className="flex items-center gap-1">
                             <span className="font-black text-[10px] uppercase tracking-[0.2em]">Chat</span>
                         </div>
@@ -825,7 +848,7 @@ function GameRoomContent() {
                         <ScrollShadow
                             ref={chatContainerRef}
                             hideScrollBar={true}
-                            className="h-full p-4 space-y-4 bg-slate-50/50 relative"
+                            className="h-full p-3 md:p-4 space-y-3 md:space-y-4 bg-slate-50/50 relative"
                             onScroll={(e) => {
                                 const target = e.currentTarget;
                                 shouldAutoScrollRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
@@ -837,21 +860,21 @@ function GameRoomContent() {
                                      backgroundSize: '20px 20px'
                                  }}/>
 
-                            <div className="relative z-10"> {/* 消息内容包裹层 */}
+                            <div className="relative z-10">
                                 {roomChatMessages.map((message, index) => (
-                                    <ChatMessageItem key={index} data={message} selfId={userInfo?.userId} />
+                                    <ChatMessageItem key={index} data={message} selfId={userInfo?.userId}/>
                                 ))}
                             </div>
                         </ScrollShadow>
                     </div>
 
-                    {/* 3. Input Area: 模拟控制台输入 */}
-                    <div className="flex-none p-3 border-t-[3px] border-slate-200 bg-white">
+                    {/* Input Area */}
+                    <div className="flex-none p-2 md:p-3 border-t-[3px] border-slate-200 bg-white">
                         <div className="flex gap-2"
                              style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                             <div className="relative flex-1">
                                 <Input
-                                    style={{height: '35px'}}
+                                    style={{height: '32px'}}
                                     placeholder="输入消息..."
                                     className="group"
                                     value={chatInputValue}
@@ -862,7 +885,6 @@ function GameRoomContent() {
                                         }
                                     }}
                                 />
-                                {/* 输入框装饰图标 */}
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20">
                                     <kbd className="font-sans">↵</kbd>
                                 </div>
@@ -870,9 +892,9 @@ function GameRoomContent() {
 
                             <Popover isOpen={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
                                 <Popover.Trigger>
-                                    <Button variant="outline" style={{width: '25px', height: '35px'}}>
+                                    <Button variant="outline" style={{width: '25px', height: '32px'}}>
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                             strokeWidth="1.5" stroke="currentColor" className="size-6">
+                                             strokeWidth="1.5" stroke="currentColor" className="size-5 md:size-6">
                                             <path strokeLinecap="round" strokeLinejoin="round"
                                                   d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z"/>
                                         </svg>
@@ -894,13 +916,13 @@ function GameRoomContent() {
                                     </Popover.Dialog>
                                 </Popover.Content>
                             </Popover>
-                            <Button style={{width: '25px', height: '35px'}}
-                                  onClick={() => {
-                                     handleSendChatMessage(chatInputValue);
-                                 }}
+                            <Button style={{width: '25px', height: '32px'}}
+                                    onClick={() => {
+                                        handleSendChatMessage(chatInputValue);
+                                    }}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                     strokeWidth="1.5" stroke="currentColor" className="size-6"
+                                     strokeWidth="1.5" stroke="currentColor" className="size-5 md:size-6"
                                      transform={"rotate(270)"}>
                                     <path strokeLinecap="round" strokeLinejoin="round"
                                           d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
@@ -910,15 +932,18 @@ function GameRoomContent() {
                     </div>
                 </div>
 
-                {/* 4. 底部品牌/版本标识 */}
+                {/* 底部品牌/版本标识 */}
                 <div className="flex items-center justify-between px-2 opacity-40">
-                    <a href="https://github.com/ChiyukiRuon/holsder-geier-web" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 transition-opacity">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    <a href="https://github.com/ChiyukiRuon/holsder-geier-web" target="_blank" rel="noopener noreferrer"
+                       className="hover:opacity-100 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                             fill="currentColor">
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                         </svg>
                     </a>
-                    <div className="flex gap-2 text-[10px] font-bold text-slate-600 uppercase">
-                        <span>{isConnected ? serverInfo ? `SERVER ${serverInfo.version}`: 'Connected' : 'Disconnected'}</span>
+                    <div className="flex gap-1 md:gap-2 text-[8px] md:text-[10px] font-bold text-slate-600 uppercase">
+                        <span>{isConnected ? serverInfo ? `SERVER ${serverInfo.version}` : 'Connected' : 'Disconnected'}</span>
                         <span>|</span>
                         <span>Client {packageJson.version}</span>
                     </div>
@@ -938,6 +963,166 @@ function GameRoomContent() {
                     initialData={userInfo}
                 />
             )}
+
+            {/* 游戏结算弹窗 */}
+            {gameState?.stage === 'end' && (
+                <Modal isOpen={isGameEndModalOpen} onOpenChange={setIsGameEndModalOpen}>
+                    <Modal.Backdrop isDismissable={false} className="bg-black/60 backdrop-blur-sm">
+                        <Modal.Container placement="center" size="md">
+                            <Modal.Dialog className="
+                                bg-white border-4 border-slate-800 rounded-2xl
+                                shadow-[12px_12px_0px_rgba(0,0,0,0.15)]
+                                overflow-hidden
+                            ">
+                                {/* 标题区 */}
+                                <div className="bg-slate-800 px-6 py-4 text-center">
+                                    <h2 className="text-2xl font-black text-white uppercase tracking-widest">
+                                        游戏结束
+                                    </h2>
+                                    <p className="text-slate-300 text-xs font-bold mt-1 uppercase tracking-wide">
+                                        Game Over
+                                    </p>
+                                </div>
+
+                                {/* 内容区 */}
+                                <Modal.Body className="p-6 space-y-6">
+                                    {/* 获胜者展示 */}
+                                    <div className="text-center space-y-4">
+                                        <div className="inline-block relative">
+                                            <div
+                                                className="absolute -inset-4 bg-linear-to-r from-amber-400 via-yellow-500 to-amber-400 rounded-full opacity-20 animate-pulse"/>
+                                            <ShowUserInfo
+                                                type={"md"}
+                                                player={players.find((p) => p.user.userId === gameEndData?.winnerId)}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="space-y-2">
+                                                <div className="text-4xl font-black text-amber-500">
+                                                    🏆 {players.find((p) => p.user.userId === gameEndData?.winnerId)?.user.nickname}
+                                                </div>
+                                                <div
+                                                    className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                                                    最终得分: <span
+                                                    className="text-amber-600 text-lg">{gameEndData?.rankings.find((r) => r.playerId === gameEndData.winnerId)?.total ?? 0}</span> 分
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 排行榜 */}
+                                    <div className="border-t-2 border-slate-200 pt-4">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+                                            最终排名与得分详情
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {gameEndData?.rankings.map((player, index) => {
+                                                // 获取该玩家的详细推牌记录
+                                                const details = gameEndData?.playerPointDetails.find(
+                                                    (d) => d.playerId === player.playerId
+                                                );
+
+                                                return (
+                                                    <div
+                                                        key={player.playerId}
+                                                        className={`flex flex-col p-3 rounded-xl border-2 transition-all
+                                                            ${index === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}                                                        `}
+                                                    >
+                                                        {/* 玩家信息首行 */}
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm
+                                                                    ${index === 0 ? 'bg-amber-400 text-white' :
+                                                                    index === 1 ? 'bg-slate-400 text-white' :
+                                                                        index === 2 ? 'bg-orange-400 text-white' :
+                                                                            'bg-slate-200 text-slate-600'}                                                                `}>
+                                                                    {index + 1}
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-black text-slate-700 text-sm">
+                                                                        {players.find((p) => p.user.userId === player.playerId)?.user.nickname}
+                                                                    </span>
+                                                                    <span
+                                                                        className="text-[10px] text-slate-400 font-bold uppercase">
+                                                                        Total: <span
+                                                                        className={index === 0 ? 'text-amber-600' : 'text-slate-600'}>{player.total} PT</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {index === 0 && gameEndData.winnerId ? (
+                                                                <span className="text-2xl animate-bounce">👑</span>
+                                                            ) : (
+                                                                <span
+                                                                    className="text-xs font-bold text-slate-400">#{index + 1}</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* 卡牌展示区：横向滚动 */}
+                                                        <div
+                                                            className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                                                            {details?.pointCards.map((cardValue: number, cardIdx: number) => (
+                                                                <div
+                                                                    key={cardIdx}
+                                                                    className="shrink-0 transform hover:-translate-y-1 transition-transform"
+                                                                >
+                                                                    <PointCard
+                                                                        cardFace="front"
+                                                                        value={cardValue}
+                                                                        width={32}
+                                                                        height={44}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                            {(!details || details.pointCards.length === 0) && (
+                                                                <span
+                                                                    className="text-[10px] italic text-slate-400">未获得卡牌</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </Modal.Body>
+
+                                {/* 底部按钮 */}
+                                <Modal.Footer className="px-6 pb-6 pt-2 flex gap-3">
+                                    <Button
+                                        className="flex-1 font-black text-sm uppercase tracking-wider"
+                                        style={{
+                                            height: '44px',
+                                            backgroundColor: '#f43f5e',
+                                            color: 'white',
+                                            border: '2px solid #be123c',
+                                        }}
+                                        onPress={() => {
+                                            setIsGameEndModalOpen(false);
+                                        }}
+                                    >
+                                        关闭
+                                    </Button>
+                                    <Button
+                                        className="flex-1 font-black text-sm uppercase tracking-wider"
+                                        style={{
+                                            height: '44px',
+                                            backgroundColor: '#3b82f6',
+                                            color: 'white',
+                                            border: '2px solid #2563eb',
+                                        }}
+                                        onPress={() => {
+                                            setIsGameEndModalOpen(false);
+                                            handleUserReady();
+                                        }}
+                                    >
+                                        准备
+                                    </Button>
+                                </Modal.Footer>
+                            </Modal.Dialog>
+                        </Modal.Container>
+                    </Modal.Backdrop>
+                </Modal>
+            )}
         </div>
     );
 }
@@ -946,10 +1131,10 @@ export default function GameRoom() {
     return (
         <Suspense fallback={
             <div className="h-screen w-full bg-slate-300 flex items-center justify-center">
-                <Spinner size="lg" />
+                <Spinner size="lg"/>
             </div>
         }>
-            <GameRoomContent />
+            <GameRoomContent/>
         </Suspense>
     );
 }

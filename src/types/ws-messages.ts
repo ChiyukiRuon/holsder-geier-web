@@ -164,14 +164,14 @@ export interface GameEndMessage extends WSMessageBase {
     type: 'game.end';
     payload: {
         winnerId?: string;
-        rankings?: Array<{
+        rankings: Array<{
             playerId: string
             total: number
         }>;
-        playerPoints: Array<{
+        playerPointDetails: Array<{
             playerId: string
-            points: number[]
-            total: number
+            pointCards: number[]
+            totalPoint: number
         }>;
         players: PlayerInfo[];
         state: GameState;
