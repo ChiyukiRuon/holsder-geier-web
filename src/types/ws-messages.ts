@@ -59,7 +59,7 @@ export interface ChatSendMessage extends WSMessageBase {
 export interface ServerPongMessage extends WSMessageBase {
     type: 'client.pong';
     payload: {
-        clientTime: number;
+        pingTime: number;
     };
 }
 

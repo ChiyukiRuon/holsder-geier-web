@@ -71,7 +71,7 @@ class WebSocketManager {
         if (message.type === 'server.ping') {
             this.send({
                 type: 'client.pong',
-                payload: { clientTime: Date.now() },
+                payload: { pingTime: message.payload.serverTime },
             });
         }
 
