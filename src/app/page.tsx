@@ -21,11 +21,11 @@ import {
     RoomInfo,
     RoomUpdateMessage,
     ServerErrorMessage,
-    ServerPingMessage,
+    ServerPingMessage, ServerToastMessage,
     UserInfo,
 } from "@/types";
 import PointCard from "@/components/PointCard";
-import {useEffect, useRef, useState} from "react";
+import {Suspense, useEffect, useRef, useState} from "react";
 import {generateNickname, generateUserColor} from "@/utils/user";
 import {useWebSocket} from "@/hooks/useWebSocket";
 import {ChatMessageItem} from "@/components/ChatMessageItem";
@@ -90,7 +90,7 @@ function PointCardStack({cards}: {cards: number[]}) {
     );
 }
 
-export default function GameRoom() {
+function GameRoomContent() {
     const searchParams = useSearchParams();
     const roomIdParam = searchParams.get("join");
 
@@ -216,6 +216,25 @@ export default function GameRoom() {
             subscribe('server.ping', (ping: ServerPingMessage["payload"]) => {
                 if (ping.latencies) {
                     setPlayerLatencies(ping.latencies);
+                }
+            }),
+
+            subscribe('server.toast', (data: ServerToastMessage["payload"]) => {
+                switch (data.type) {
+                    case "info":
+                        toast.info(data.message);
+                        break;
+                    case "success":
+                        toast.success(data.message);
+                        break;
+                    case "warning":
+                        toast.warning(data.message);
+                        break;
+                    case "danger":
+                        toast.danger(data.message);
+                        break;
+                    default:
+                        toast.info(data.message);
                 }
             }),
 
@@ -920,5 +939,17 @@ export default function GameRoom() {
                 />
             )}
         </div>
+    );
+}
+
+export default function GameRoom() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen w-full bg-slate-300 flex items-center justify-center">
+                <Spinner size="lg" />
+            </div>
+        }>
+            <GameRoomContent />
+        </Suspense>
     );
 }

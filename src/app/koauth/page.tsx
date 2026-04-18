@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getKookUserInfo } from "@/lib/api/kook";
 
-export default function KoauthPage() {
+function KoauthContent() {
     const searchParams = useSearchParams();
     const code = searchParams.get("code");
 
@@ -125,11 +125,11 @@ export default function KoauthPage() {
 
                 <div className="text-center mb-8">
                     <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-3">授权失败</h1>
-                    (error ? {
+                    {error && (
                         <p className="text-slate-600 font-bold text-sm bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-3 inline-block">
                             {error}
                         </p>
-                    } : null)
+                    )}
                 </div>
 
                 <Footer text="AUTH FAILED" />
@@ -138,6 +138,18 @@ export default function KoauthPage() {
     }
 
     return null;
+}
+
+export default function KoauthPage() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen w-full bg-slate-300 flex items-center justify-center">
+                <div className="text-slate-600 font-bold">加载中...</div>
+            </div>
+        }>
+            <KoauthContent />
+        </Suspense>
+    );
 }
 
 function Footer({ text }: { text: string }) {

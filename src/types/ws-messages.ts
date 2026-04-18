@@ -72,6 +72,14 @@ export interface ServerPingMessage extends WSMessageBase {
     };
 }
 
+export interface ServerToastMessage extends WSMessageBase {
+    type: 'server.toast';
+    payload: {
+        type: 'info' | 'success' | 'warning' | 'danger';
+        message: string;
+    };
+}
+
 export interface ServerInfoMessage extends WSMessageBase {
     type: 'server.info';
     payload: {
