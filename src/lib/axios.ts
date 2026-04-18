@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:47381';
 const WS_URL = `${process.env.NEXT_PUBLIC_WS_BASE_URL || 'ws://localhost:47381'}/ws`;
 
 interface RequestOptions {

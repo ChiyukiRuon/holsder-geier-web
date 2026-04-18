@@ -1,3 +1,3 @@
 export const getObjectURL = (key: string) => {
-    return key.replace("hdg", "/uploads");
+    return `${process.env.NEXT_PUBLIC_CDN_BASE_URL}/${key}`;
 }

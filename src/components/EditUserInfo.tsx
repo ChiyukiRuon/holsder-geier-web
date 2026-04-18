@@ -73,8 +73,8 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
     });
 
     const handleKookLogin = () => {
-        const clientId = process.env.KOOK_CLIENT_ID ||  "kook_client_id";
-        const redirectUri = process.env.KOOK_REDIRECT_URI || "kook_redirect_uri";
+        const clientId = process.env.NEXT_PUBLIC_KOOK_CLIENT_ID ||  "kook_client_id";
+        const redirectUri = process.env.NEXT_PUBLIC_KOOK_REDIRECT_URI || "kook_redirect_uri";
         const scope = "get_user_info";
 
         const authUrl = `https://www.kookapp.cn/app/oauth2/authorize?id=24532&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
