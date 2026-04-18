@@ -2,7 +2,7 @@ import ShowUserInfo from "@/components/ShowUserInfo";
 import {HandCard} from "@/components/HandCard";
 import KOOK from "@/components/icons/KOOK";
 import Google from "@/components/icons/Google";
-import {useState, useRef, useEffect} from "react";
+import React, {useState, useRef} from "react";
 import { UserInfo } from "@/types";
 import {useGoogleLogin} from "@react-oauth/google";
 import {generateUserColor, getGoogleProfile} from "@/utils/user";
@@ -35,7 +35,7 @@ type ImageFlowState = {
 };
 
 export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserInfoProps) => {
-    const [userId, setUserId] = useState(initialData?.userId || "");
+    const userId = initialData?.userId || "";
     const [tempNickname, setTempNickname] = useState(initialData?.nickname || "");
     const [tempAvatar, setTempAvatar] = useState(initialData?.avatar || "");
     const [tempColor, setTempColor] = useState(initialData?.color || "");
@@ -57,13 +57,8 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
     const avatarFileInputRef = useRef<HTMLInputElement>(null);
     const backgroundFileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        console.log(initialData)
-    }, []);
-
     const handleGoogleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
-            // tokenResponse.access_token 就是我们要的令牌
             try {
                 const profile = await getGoogleProfile(tokenResponse.access_token);
                 console.log("用户信息:", profile);
@@ -78,8 +73,8 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
     });
 
     const handleKookLogin = () => {
-        const clientId = "XG7IAyXh63KhEYAE";
-        const redirectUri = "http://local.chiyukiruon.top:3000/koauth";
+        const clientId = process.env.KOOK_CLIENT_ID ||  "kook_client_id";
+        const redirectUri = process.env.KOOK_REDIRECT_URI || "kook_redirect_uri";
         const scope = "get_user_info";
 
         const authUrl = `https://www.kookapp.cn/app/oauth2/authorize?id=24532&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
@@ -97,14 +92,15 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
         );
 
         if (!popup) {
-            toast.warning("请允许弹出窗口以进行KOOK登录");
+            toast.warning("请允许弹出窗口以进行 KOOK Oauth");
             return;
         }
 
-        // 监听来自koauth页面的消息
+        // 监听来自 KOOK Oauth 页面的消息
         const handleMessage = (event: MessageEvent) => {
             // 验证消息来源（生产环境中应该验证origin）
             if (event.data?.type === "KOOK_LOGIN_SUCCESS") {
+                toast.success("获取 KOOK 信息成功");
                 const { nickname, avatar } = event.data.data;
 
                 setTempNickname(nickname);
@@ -114,8 +110,8 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                 popup.close();
                 window.removeEventListener("message", handleMessage);
             } else if (event.data?.type === "KOOK_LOGIN_ERROR") {
-                console.error("KOOK登录失败:", event.data.error);
-                alert(`KOOK登录失败: ${event.data.error}`);
+                console.error("获取 KOOK 信息失败:", event.data.error);
+                toast.danger(`获取 KOOK 信息失败: ${event.data.error}`, { timeout: 5000 })
 
                 popup.close();
                 window.removeEventListener("message", handleMessage);

@@ -19,10 +19,7 @@ export interface PlayerPoint {
 export interface PlayerInfo {
     user: UserInfo;
     card: number[];
-    point: {
-        count: number;
-        list: number[];
-    };
+    point: PlayerPoint;
     currentPlayerCard?: number;
     lastPlayerCard?: number;
     ready: boolean;

@@ -4,7 +4,7 @@ import React, { useState, useLayoutEffect, useRef } from "react";
 import { HandCard } from "@/components/HandCard";
 import { UserInfo } from "@/types";
 
-export const DynamicHand = ({ cards, user, onCardPlay }: { cards: number[], user: UserInfo, onCardPlay?: (card: number) => void }) => {
+export const DynamicHand = ({ cards, user, onCardPlayAction }: { cards: number[], user: UserInfo, onCardPlayAction?: (card: number) => void }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(0);
     const [draggedCardIndex, setDraggedCardIndex] = useState<number | null>(null);
@@ -60,8 +60,8 @@ export const DynamicHand = ({ cards, user, onCardPlay }: { cards: number[], user
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         const cardIndex = parseInt(e.dataTransfer.getData('text/plain'));
-        if (!isNaN(cardIndex) && onCardPlay) {
-            onCardPlay(cards[cardIndex]);
+        if (!isNaN(cardIndex) && onCardPlayAction) {
+            onCardPlayAction(cards[cardIndex]);
         }
         setDraggedCardIndex(null);
     };

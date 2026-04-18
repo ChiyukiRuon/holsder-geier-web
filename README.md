@@ -48,18 +48,14 @@ npm install
 
 ```env
 # API 服务器地址
-NEXT_PUBLIC_API_URL=/api
+SERVER_BASE_URL=/api
 
-# WebSocket 服务器地址
-NEXT_PUBLIC_WS_URL=/ws
+# CDN 服务器地址
+CDN_BASE_URL=/cdn
 
-# Google OAuth 配置（可选）
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
-NEXT_PUBLIC_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
-
-# KOOK OAuth 配置（可选）
-NEXT_PUBLIC_KOOK_CLIENT_ID=your_kook_client_id
-NEXT_PUBLIC_KOOK_REDIRECT_URI=http://localhost:3000/auth/kook/callback
+# KOOK OAuth 配置
+KOOK_CLIENT_ID=your_kook_client_id
+KOOK_REDIRECT_URI=http://localhost:3000/koauth
 ```
 
 4. **启动开发服务器**

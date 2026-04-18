@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import {GoogleOAuthProvider} from "@react-oauth/google";
 import {Toast} from "@heroui/react";
+import React from "react";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -15,13 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "獴鹫派对 | MongoJo Party",
-    description: "一款多人卡牌派对游戏，邀请好友一起挑战！",
-    keywords: ["獴鹫派对", "MongoJo Party", "多人游戏", "卡牌游戏", "派对游戏"],
-    authors: [{ name: "MongoJo Team" }],
+    title: "獴鹫派对",
+    description: "一款多人卡牌派对游戏",
+    authors: [{ name: "ChiyukiRuon" }],
     openGraph: {
-        title: "獴鹫派对 | MongoJo Party",
-        description: "一款多人卡牌派对游戏，邀请好友一起挑战！",
+        title: "獴鹫派对",
+        description: "一款多人卡牌派对游戏",
         type: "website",
         locale: "zh_CN",
     },

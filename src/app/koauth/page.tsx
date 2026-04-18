@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { getKookUserInfo } from "@/lib/api/kook";
 
 export default function KoauthPage() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const code = searchParams.get("code");
 
@@ -21,7 +20,7 @@ export default function KoauthPage() {
 
         let isMounted = true;
 
-        const postToOpener = (payload: any) => {
+        const postToOpener = (payload: { type: string; data?: unknown; error?: string }) => {
             if (window.opener && !window.opener.closed) {
                 window.opener.postMessage(payload, window.location.origin);
             }
@@ -32,7 +31,12 @@ export default function KoauthPage() {
                 const userInfo = await getKookUserInfo(code);
 
                 if (!userInfo?.nickname) {
-                    throw new Error("用户信息不完整");
+                    setError("用户信息不完整");
+                    postToOpener({
+                        type: "KOOK_LOGIN_ERROR",
+                        error: "用户信息不完整",
+                    });
+                    return;
                 }
 
                 postToOpener({

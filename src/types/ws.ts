@@ -1,7 +1,6 @@
 // 事件处理器类型
 import {WSMessage} from "@/types/ws-messages";
-import {PlayerInfo, SendChatMessage, UserInfo} from "@/types/base";
-import {GameState} from "@/types/game";
+import {SendChatMessage, UserInfo} from "@/types/base";
 
 export type WSEventHandler<T = unknown> = (data: T) => void;
 

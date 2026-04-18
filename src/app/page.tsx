@@ -1,21 +1,28 @@
 'use client';
 
 import packageJson from "../../package.json";
-import {Badge, Button, Input, Popover, ScrollShadow, toast} from "@heroui/react";
+import {Badge, Button, Input, Popover, ScrollShadow, Spinner, toast} from "@heroui/react";
 import ShowUserInfo from "@/components/ShowUserInfo";
 import {EditUserInfo} from "@/components/EditUserInfo";
 import {DynamicHand} from "@/components/DynamicHand";
 import {PlayAreaCard} from "@/components/PlayAreaCard";
 import {
-    PlayerInfo,
-    RoomUpdateMessage,
-    RoomInfo,
-    UserInfo,
-    GameSyncMessage,
+    ChatReceiveMessage,
+    ChatSyncMessage,
+    GameEndMessage,
+    GameResolveMessage,
+    GameStartMessage,
     GameState,
-    ServerErrorMessage, PlayerLatency, ServerPingMessage,
-    GameStartMessage, GameStateMessage, GameEndMessage, ChatSyncMessage,
-    ChatReceiveMessage, ReceiveChatMessage, GameResolveMessage, ServerInfo, ServerInfoMessage
+    GameStateMessage,
+    GameSyncMessage,
+    PlayerInfo,
+    PlayerLatency,
+    ReceiveChatMessage,
+    RoomInfo,
+    RoomUpdateMessage,
+    ServerErrorMessage,
+    ServerPingMessage,
+    UserInfo,
 } from "@/types";
 import PointCard from "@/components/PointCard";
 import {useEffect, useRef, useState} from "react";
@@ -23,6 +30,7 @@ import {generateNickname, generateUserColor} from "@/utils/user";
 import {useWebSocket} from "@/hooks/useWebSocket";
 import {ChatMessageItem} from "@/components/ChatMessageItem";
 import {getGameStageName} from "@/utils/game";
+import {useSearchParams} from "next/navigation";
 
 function PointDeckBack({count}: { count: number }) {
     return (
@@ -83,13 +91,10 @@ function PointCardStack({cards}: {cards: number[]}) {
 }
 
 export default function GameRoom() {
-    const [userInfo, setUserInfo] = useState<UserInfo>({
-        userId: crypto.randomUUID(),
-        nickname: generateNickname(),
-        avatar: "",
-        background: "",
-        color: generateUserColor()
-    });
+    const searchParams = useSearchParams();
+    const roomIdParam = searchParams.get("join");
+
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [players, setPlayers] = useState<PlayerInfo[]>([]);
     const [playerLatencies, setPlayerLatencies] = useState<PlayerLatency[]>([]);
 
@@ -189,6 +194,19 @@ export default function GameRoom() {
             setUserInfo(info);
         }
     }, []);
+
+    useEffect(() => {
+        if (!userInfo || !isConnected || !roomIdParam) return;
+
+        joinRoom(roomIdParam, userInfo)
+            .then(() => {
+                setIsInRoom(true);
+                setRoomId(roomIdParam);
+            })
+            .catch(err => {
+                toast.danger(err.message);
+            });
+    }, [joinRoom, userInfo, isConnected, searchParams, roomIdParam]);
 
     // WS 消息处理
     useEffect(() => {
@@ -336,10 +354,10 @@ export default function GameRoom() {
     };
 
     const handleJoinRoom = (inputRoomId: string) => {
-        if (!inputRoomId.trim()) return;
+        if (!inputRoomId.trim() || !userInfo) return;
 
         setIsJoining(true);
-        joinRoom(inputRoomId, userInfo).then((res) => {
+        joinRoom(inputRoomId, userInfo).then(() => {
             setRoomId(inputRoomId);
             setIsInRoom(true);
         }).catch(err => {
@@ -376,6 +394,8 @@ export default function GameRoom() {
     };
 
     const handleCardPlay = (card: number) => {
+        if (!userInfo) return;
+
         sendGameAction(card).then(() => {
             console.log('send game action', card);
 
@@ -405,7 +425,7 @@ export default function GameRoom() {
     };
 
     const handleSendChatMessage = (message: string) => {
-        if (!message.trim()) return;
+        if (!message.trim() || !userInfo) return;
         sendChatMessage(message, userInfo).then(() => {
             setChatInputValue("");
             shouldAutoScrollRef.current = true;
@@ -543,13 +563,13 @@ export default function GameRoom() {
                             <div
                                 className="absolute -inset-x-8 top-12 -bottom-8 bg-linear-to-t from-slate-900/10 to-transparent pointer-events-none"/>
 
-                            {isGameStarted ?
+                            {isGameStarted && userInfo ?
                                 (
                                     <div className="h-full flex items-end justify-center">
                                         <DynamicHand
                                             cards={players.find(p => p.user.userId === userInfo.userId)?.card ?? []}
                                             user={userInfo}
-                                            onCardPlay={(card) => handleCardPlay(card)}
+                                            onCardPlayAction={(card) => handleCardPlay(card)}
                                         />
                                     </div>
                                 ) : (
@@ -644,7 +664,13 @@ export default function GameRoom() {
                                         border: '2px solid #2563eb',
                                     }}
                                     onPress={() => {
-                                        navigator.clipboard.writeText(roomId);
+                                        const currentUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                                        navigator.clipboard.writeText(currentUrl ? `${currentUrl}?join=${roomId}` : roomId).then(() => {
+                                            toast.success(`已复制房间${currentUrl ? "链接" : "号"}`);
+                                        }).catch((e) => {
+                                            console.error(e);
+                                            toast.danger("分享失败");
+                                        });
                                     }}
                                 >
                                     分享
@@ -686,7 +712,9 @@ export default function GameRoom() {
                                     }}
                                     onPress={() => handleJoinRoom(roomId)}
                                     isDisabled={!roomId.trim() || !isConnected}
+                                    isPending={isJoining}
                                 >
+                                    {isJoining ? <Spinner color="current" size="sm" /> : null}
                                     加入
                                 </Button>
                             </div>
@@ -701,62 +729,64 @@ export default function GameRoom() {
                         className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tight shrink-0">Players
                     </div>
                     <div className="flex-1 min-h-0 overflow-hidden">
-                        <div className="flex flex-col gap-1 h-full overflow-y-auto">
-                            <Badge.Anchor className={"m-1"}>
-                                <ShowUserInfo
-                                    type={"lg"}
-                                    player={{
-                                        user: userInfo,
-                                        latency: playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0,
-                                        ready: false,
-                                        card: [],
-                                        point: players.find((p) => p.user.userId === userInfo.userId)?.point || { count: 0, list: [] },
-                                        currentPlayerCard: undefined,
-                                        lastPlayerCard: undefined
-                                    }}
-                                    latency={players.find((p) => p.user.userId === userInfo.userId)?.latency || 0}
-                                    showEditButton={true}
-                                    onEdit={() => {
-                                        setIsEditModalOpen(true);
-                                    }}
-                                />
-                                {isUserReady && (
-                                    <Badge color={"success"} size={"sm"}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                             strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
-                                        </svg>
-                                    </Badge>
-                                )}
-                            </Badge.Anchor>
-                            {players.length === 0 && (
-                                <div className="text-center text-xs text-slate-400 py-4">
-                                {isConnected ? isInRoom ? '等待其他玩家加入...' : '未加入房间' : '未连接'}
-                                </div>
-                            )}
-                            {players.map((p) => (
-                                p.user.userId !== userInfo?.userId && (
-                                    <div key={p.user.userId}
-                                         className="flex items-center justify-between p-2 rounded-lg bg-content1 shrink-0">
-                                        <Badge.Anchor className={"w-full"}>
-                                            <ShowUserInfo
-                                                type={"lg"}
-                                                player={p}
-                                                latency={playerLatencies.find(pl => pl.userId === p.user.userId)?.latency ?? p.latency}
-                                                onEdit={() => setIsEditModalOpen(true)}
-                                            />
-                                            {p.ready && <Badge color={"success"} size={"sm"}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                     strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round"
-                                                          d="m4.5 12.75 6 6 9-13.5"/>
-                                                </svg>
-                                            </Badge>}
-                                        </Badge.Anchor>
+                        {userInfo && (
+                            <div className="flex flex-col gap-1 h-full overflow-y-auto">
+                                <Badge.Anchor className={"m-1"}>
+                                    <ShowUserInfo
+                                        type={"lg"}
+                                        player={{
+                                            user: userInfo,
+                                            latency: playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0,
+                                            ready: false,
+                                            card: [],
+                                            point: players.find((p) => p.user.userId === userInfo.userId)?.point || { count: 0, list: [] },
+                                            currentPlayerCard: undefined,
+                                            lastPlayerCard: undefined
+                                        }}
+                                        latency={playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0}
+                                        showEditButton={true}
+                                        onEdit={() => {
+                                            setIsEditModalOpen(true);
+                                        }}
+                                    />
+                                    {isUserReady && (
+                                        <Badge color={"success"} size={"sm"}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                 strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                                            </svg>
+                                        </Badge>
+                                    )}
+                                </Badge.Anchor>
+                                {players.length === 0 && (
+                                    <div className="text-center text-xs text-slate-400 py-4">
+                                        {isConnected ? isInRoom ? '等待其他玩家加入...' : '未加入房间' : '未连接'}
                                     </div>
-                                )
-                            ))}
-                        </div>
+                                )}
+                                {players.map((p) => (
+                                    p.user.userId !== userInfo?.userId && (
+                                        <div key={p.user.userId}
+                                             className="flex items-center justify-between p-2 rounded-lg bg-content1 shrink-0">
+                                            <Badge.Anchor className={"w-full"}>
+                                                <ShowUserInfo
+                                                    type={"lg"}
+                                                    player={p}
+                                                    latency={playerLatencies.find(pl => pl.userId === p.user.userId)?.latency ?? p.latency}
+                                                    onEdit={() => setIsEditModalOpen(true)}
+                                                />
+                                                {p.ready && <Badge color={"success"} size={"sm"}>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                         strokeWidth="1.5" stroke="currentColor" className="size-2.5" color={"white"}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                                              d="m4.5 12.75 6 6 9-13.5"/>
+                                                    </svg>
+                                                </Badge>}
+                                            </Badge.Anchor>
+                                        </div>
+                                    )
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -779,8 +809,7 @@ export default function GameRoom() {
                             className="h-full p-4 space-y-4 bg-slate-50/50 relative"
                             onScroll={(e) => {
                                 const target = e.currentTarget;
-                                const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
-                                shouldAutoScrollRef.current = isAtBottom;
+                                shouldAutoScrollRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
                             }}
                         >
                             <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -877,7 +906,7 @@ export default function GameRoom() {
                 </div>
             </div>
 
-            {isEditModalOpen && (
+            {isEditModalOpen && userInfo && (
                 <EditUserInfo
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
