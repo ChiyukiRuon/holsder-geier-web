@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import { wsManager } from '@/lib/ws';
-import type {ServerInfo, ServerMessage, UserInfo} from '@/types';
+import type {RoomRole, ServerInfo, ServerMessage, UserInfo} from '@/types';
 
 /**
  * 使用 WebSocket 连接的 Hook
@@ -89,6 +89,10 @@ export function useWebSocket(options: {
         return wsManager.leaveRoom();
     }, []);
 
+    const changeRole = useCallback((role: RoomRole) => {
+        return wsManager.changeRole(role);
+    }, [])
+
     // 设置准备状态
     const setReady = useCallback((ready: boolean) => {
         return wsManager.setReady(ready);
@@ -115,6 +119,7 @@ export function useWebSocket(options: {
         createRoom,
         joinRoom,
         leaveRoom,
+        changeRole,
         setReady,
         sendGameAction,
         sendChatMessage,

@@ -23,3 +23,6 @@ export type GameStage = 'idle' | 'reveal' | 'play' | 'resolve' | 'end';
 
 // 房间状态
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
+
+// 房间角色
+export type RoomRole = 'player' | 'spectator';

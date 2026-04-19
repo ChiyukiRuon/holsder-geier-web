@@ -2,7 +2,7 @@ import ShowUserInfo from "@/components/ShowUserInfo";
 import {HandCard} from "@/components/HandCard";
 import KOOK from "@/components/icons/KOOK";
 import Google from "@/components/icons/Google";
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import { UserInfo } from "@/types";
 import {useGoogleLogin} from "@react-oauth/google";
 import {generateUserColor, getGoogleProfile} from "@/utils/user";
@@ -36,10 +36,10 @@ type ImageFlowState = {
 
 export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserInfoProps) => {
     const userId = initialData?.userId || "";
-    const [tempNickname, setTempNickname] = useState(initialData?.nickname || "");
-    const [tempAvatar, setTempAvatar] = useState(initialData?.avatar || "");
-    const [tempColor, setTempColor] = useState(initialData?.color || "");
-    const [tempBackground, setTempBackground] = useState(initialData?.background || "");
+    const [tempNickname, setTempNickname] = useState("");
+    const [tempAvatar, setTempAvatar] = useState("");
+    const [tempColor, setTempColor] = useState("");
+    const [tempBackground, setTempBackground] = useState("");
 
     const tempUserInfo: UserInfo = {
         userId,
@@ -56,6 +56,15 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
 
     const avatarFileInputRef = useRef<HTMLInputElement>(null);
     const backgroundFileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isOpen && initialData) {
+            setTempNickname(initialData.nickname || "");
+            setTempAvatar(initialData.avatar || "");
+            setTempColor(initialData.color || "");
+            setTempBackground(initialData.background || "");
+        }
+    }, [isOpen, initialData]);
 
     const handleGoogleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {

@@ -1,5 +1,5 @@
 // 用户信息
-import {RoomStatus} from "@/types/enums";
+import {RoomRole, RoomStatus} from "@/types/enums";
 
 export interface UserInfo {
     userId: string;
@@ -18,6 +18,7 @@ export interface PlayerPoint {
 // 玩家信息（用于 UI 显示）
 export interface PlayerInfo {
     user: UserInfo;
+    role: RoomRole;
     card: number[];
     point: PlayerPoint;
     currentPlayerCard?: number;
@@ -35,6 +36,7 @@ export interface PlayerLatency {
 export interface RoomInfo {
     roomId: string;
     players: PlayerInfo[];
+    spectators: PlayerInfo[];
     status: RoomStatus;
     maxPlayers: number;
 }

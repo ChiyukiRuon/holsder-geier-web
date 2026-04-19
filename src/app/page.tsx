@@ -1,7 +1,7 @@
 'use client';
 
 import packageJson from "../../package.json";
-import {Badge, Button, Input, Modal, Popover, ScrollShadow, Spinner, toast} from "@heroui/react";
+import {Badge, Button, Input, Modal, Popover, ScrollShadow, Spinner, toast, Tooltip} from "@heroui/react";
 import ShowUserInfo from "@/components/ShowUserInfo";
 import {EditUserInfo} from "@/components/EditUserInfo";
 import {DynamicHand} from "@/components/DynamicHand";
@@ -19,9 +19,11 @@ import {
     PlayerLatency,
     ReceiveChatMessage,
     RoomInfo,
+    RoomRole,
     RoomUpdateMessage,
     ServerErrorMessage,
-    ServerPingMessage, ServerToastMessage,
+    ServerPingMessage,
+    ServerToastMessage,
     UserInfo,
 } from "@/types";
 import PointCard from "@/components/PointCard";
@@ -31,6 +33,11 @@ import {useWebSocket} from "@/hooks/useWebSocket";
 import {ChatMessageItem} from "@/components/ChatMessageItem";
 import {getGameStageName} from "@/utils/game";
 import {useSearchParams} from "next/navigation";
+import Check from "@/components/icons/Check";
+import FaceSmile from "@/components/icons/FaceSmile";
+import PaperAirplane from "@/components/icons/PaperAirplane";
+import GitHub from "@/components/icons/GitHub";
+import Eye from "@/components/icons/Eye";
 
 function PointDeckBack({count}: { count: number }) {
     return (
@@ -97,6 +104,7 @@ function GameRoomContent() {
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [players, setPlayers] = useState<PlayerInfo[]>([]);
     const [playerLatencies, setPlayerLatencies] = useState<PlayerLatency[]>([]);
+    const [spectators, setSpectators] = useState<PlayerInfo[]>([]);
 
     const [roomId, setRoomId] = useState("");
     const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
@@ -130,6 +138,7 @@ function GameRoomContent() {
         subscribe,
         joinRoom,
         leaveRoom,
+        changeRole,
         setReady,
         sendGameAction,
         sendChatMessage,
@@ -141,6 +150,28 @@ function GameRoomContent() {
     const isGameStarted = (() => {
         if (!gameState) return false;
         return gameState.stage !== "idle" && gameState.stage !== "end";
+    })();
+
+    const selfPlayerInfo: PlayerInfo | undefined = (() => {
+        if (!userInfo) return undefined;
+        if (!isInRoom) {
+            return {
+                user: userInfo,
+                role: "player",
+                latency: 0,
+                ready: false,
+                card: [],
+                point: players.find((p) => p.user.userId === userInfo.userId)?.point || {
+                    count: 0,
+                    list: []
+                },
+                currentPlayerCard: undefined,
+                lastPlayerCard: undefined
+            }
+        } else {
+            return players.find((p) => p.user.userId === userInfo.userId)
+                ?? spectators.find((p) => p.user.userId === userInfo.userId)!;
+        }
     })();
 
     const playedCards = (() => {
@@ -248,6 +279,7 @@ function GameRoomContent() {
             subscribe('room.update', (data: RoomUpdateMessage["payload"]) => {
                 console.log('room update', data.room);
                 setPlayers(data.room.players);
+                setSpectators(data.room.spectators);
                 setRoomInfo(data.room);
             }),
 
@@ -255,6 +287,7 @@ function GameRoomContent() {
                 console.log('game start', data);
                 setGameState(data.state);
                 setPlayers(data.players);
+                setSpectators(data.spectators);
                 setIsUserReady(false);
                 setRoundWinner(null);
                 setIsGameEndModalOpen(false);
@@ -265,6 +298,7 @@ function GameRoomContent() {
                 console.log('game end', data);
                 setGameState(data.state);
                 setPlayers(data.players);
+                setSpectators(data.spectators)
                 setIsUserReady(false);
                 setGameEndData(data);
                 setIsGameEndModalOpen(true);
@@ -274,6 +308,7 @@ function GameRoomContent() {
                 console.log('game resolve', data);
                 setGameState(data.state);
                 setPlayers(data.players);
+                setSpectators(data.spectators);
                 setRoundWinner(data.roundWinner);
                 setIsUserReady(false);
             }),
@@ -314,6 +349,7 @@ function GameRoomContent() {
                 console.log('game state', data);
                 setGameState(data.state);
                 setPlayers(data.players);
+                setSpectators(data.spectators);
                 setRoundWinner(null);
             }),
 
@@ -447,6 +483,16 @@ function GameRoomContent() {
         }).catch(err => {
             console.error('send game action error', err);
             toast.danger(`出现错误: ${err.message}`, {timeout: 5000})
+        });
+    };
+
+    const handleRoleChange = (role: RoomRole) => {
+        if (!userInfo || !players) return;
+        changeRole(role).then(() => {
+
+        }).catch(err => {
+            console.error('change role error', err);
+            toast.danger(`切换失败: ${err.message}`, {timeout: 5000})
         });
     };
 
@@ -597,81 +643,88 @@ function GameRoomContent() {
                             <div
                                 className="absolute -inset-x-8 top-12 -bottom-8 bg-linear-to-t from-slate-900/10 to-transparent pointer-events-none"/>
 
-                            {isGameStarted && userInfo ?
-                                (
-                                    <div className="h-full flex items-end justify-center">
-                                        <DynamicHand
-                                            cards={players.find(p => p.user.userId === userInfo.userId)?.card ?? []}
-                                            user={userInfo}
-                                            onCardPlayAction={(card) => handleCardPlay(card)}
-                                        />
+                            {!isInRoom ? null : selfPlayerInfo?.role === 'spectator' ? (
+                                <div className="flex flex-col gap-2 items-center justify-center h-full animate-in fade-in zoom-in duration-300">
+                                    <div
+                                        className="px-6 py-3 bg-slate-700 text-white rounded-xl border-[3px] border-slate-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)]"
+                                    >
+                                        <span className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                                            <Eye className="w-4 h-4" />
+                                            观战中 SPECTATING
+                                        </span>
                                     </div>
-                                ) : (
-                                    isInRoom && (
-                                        <div
-                                            className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-300">
-                                            {isUserReady ?
-                                                (
-                                                    <Button
-                                                        className="relative group transition-all duration-200 active:translate-y-1"
-                                                        style={{
-                                                            height: '40px',
-                                                            padding: '0 30px',
-                                                            backgroundColor: '#f43f5e',
-                                                            color: 'white',
-                                                            fontSize: '12px',
-                                                            fontWeight: '900',
-                                                            letterSpacing: '0.15em',
-                                                            borderRadius: '12px',
-                                                            border: 'none',
-                                                            boxShadow: '0 4px 0 0 #be123c, 0 8px 15px -5px rgba(244, 63, 94, 0.4)',
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                        onClick={() => {
-                                                            handleUserReady();
-                                                        }}
-                                                    >
-                                                        <span className="relative z-10">取消 CANCEL</span>
-                                                        <div
-                                                            className="absolute inset-0 rounded-3xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        className="relative group transition-all duration-200 active:translate-y-1"
-                                                        style={{
-                                                            height: '40px',
-                                                            padding: '0 30px',
-                                                            backgroundColor: '#3b82f6',
-                                                            color: 'white',
-                                                            fontSize: '12px',
-                                                            fontWeight: '900',
-                                                            letterSpacing: '0.15em',
-                                                            borderRadius: '12px',
-                                                            border: 'none',
-                                                            boxShadow: '0 4px 0 0 #2563eb, 0 8px 15px -5px rgba(59, 130, 246, 0.5)',
-                                                            cursor: 'pointer',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            textTransform: 'uppercase'
-                                                        }}
-                                                        onClick={() => {
-                                                            handleUserReady();
-                                                        }}
-                                                    >
-                                                        <span className="relative z-10">准备 READY</span>
-                                                        <div
-                                                            className="absolute inset-0 rounded-12px bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
-                                                    </Button>
-                                                )}
-                                        </div>
-                                    )
-                                )
-                            }
+                                </div>
+                            ) : isGameStarted && userInfo ? (
+                                <div className="h-full flex items-end justify-center">
+                                    <DynamicHand
+                                        cards={players.find(p => p.user.userId === userInfo.userId)?.card ?? []}
+                                        user={userInfo}
+                                        onCardPlayAction={(card) => handleCardPlay(card)}
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-300">
+                                    {isUserReady ?
+                                        (
+                                            <Button
+                                                className="relative group transition-all duration-200 active:translate-y-1"
+                                                style={{
+                                                    height: '40px',
+                                                    padding: '0 30px',
+                                                    backgroundColor: '#f43f5e',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    fontWeight: '900',
+                                                    letterSpacing: '0.15em',
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    boxShadow: '0 4px 0 0 #be123c, 0 8px 15px -5px rgba(244, 63, 94, 0.4)',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    textTransform: 'uppercase'
+                                                }}
+                                                onClick={() => {
+                                                    handleUserReady();
+                                                }}
+                                            >
+                                                <span className="relative z-10">取消 CANCEL</span>
+                                                <div
+                                                    className="absolute inset-0 rounded-3xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                className="relative group transition-all duration-200 active:translate-y-1"
+                                                style={{
+                                                    height: '40px',
+                                                    padding: '0 30px',
+                                                    backgroundColor: '#3b82f6',
+                                                    color: 'white',
+                                                    fontSize: '12px',
+                                                    fontWeight: '900',
+                                                    letterSpacing: '0.15em',
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    boxShadow: '0 4px 0 0 #2563eb, 0 8px 15px -5px rgba(59, 130, 246, 0.5)',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    textTransform: 'uppercase'
+                                                }}
+                                                onClick={() => {
+                                                    handleUserReady();
+                                                }}
+                                            >
+                                                <span className="relative z-10">准备 READY</span>
+                                                <div
+                                                    className="absolute inset-0 rounded-12px bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                                            </Button>
+                                        )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -694,9 +747,10 @@ function GameRoomContent() {
                                     className="w-full font-black text-xs uppercase tracking-wider"
                                     style={{
                                         height: '36px',
-                                        backgroundColor: '#3b82f6',
+                                        backgroundColor: '#f59e0b',
                                         color: 'white',
-                                        border: '2px solid #2563eb',
+                                        border: '2px solid #d97706',
+                                        boxShadow: '0 2px 0 0 #b45309',
                                     }}
                                     onPress={() => {
                                         const currentUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -710,6 +764,37 @@ function GameRoomContent() {
                                 >
                                     分享
                                 </Button>
+                                {players.find((p) => p.user.userId === userInfo?.userId)?.role === "player" ? (
+                                    <Button
+                                        className="w-full font-black text-xs uppercase tracking-wider"
+                                        style={{
+                                            height: '36px',
+                                            backgroundColor: '#8b5cf6',
+                                            color: 'white',
+                                            border: '2px solid #7c3aed',
+                                            boxShadow: '0 2px 0 0 #6d28d9',
+                                        }}
+                                        onClick={() => handleRoleChange("spectator")}
+                                        isDisabled={isGameStarted}
+                                    >
+                                        观战
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full font-black text-xs uppercase tracking-wider"
+                                        style={{
+                                            height: '36px',
+                                            backgroundColor: '#10b981',
+                                            color: 'white',
+                                            border: '2px solid #059669',
+                                            boxShadow: '0 2px 0 0 #047857',
+                                        }}
+                                        onClick={() => handleRoleChange("player")}
+                                        isDisabled={isGameStarted}
+                                    >
+                                        游玩
+                                    </Button>
+                                )}
                                 <Button
                                     className="w-full font-black text-xs uppercase tracking-wider"
                                     style={{
@@ -717,6 +802,7 @@ function GameRoomContent() {
                                         backgroundColor: '#ef4444',
                                         color: 'white',
                                         border: '2px solid #dc2626',
+                                        boxShadow: '0 2px 0 0 #b91c1c',
                                     }}
                                     onPress={handleLeaveRoom}
                                 >
@@ -761,7 +847,32 @@ function GameRoomContent() {
                 <div
                     className="bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] p-2 md:p-3 flex flex-col">
                     <div
-                        className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tight shrink-0">Players
+                        className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tight shrink-0 flex justify-between items-center"
+                    >
+                        <div>Players</div>
+                        {spectators.length > 0 && (
+                            <Tooltip delay={0}>
+                                <Tooltip.Trigger>
+                                    <div className={"text-[8px] flex gap-1 items-center"}>
+                                        <Eye className={"w-4 h-4"} />
+                                        <div className={"text-xs"}>{spectators.length}</div>
+                                    </div>
+                                </Tooltip.Trigger>
+                                <Tooltip.Content>
+                                    <div className="text-xs">
+                                        {spectators.map((s) => (
+                                            <div key={s.user.userId}
+                                                 className="flex items-center gap-1"
+                                                 style={{
+                                                     color: s.user.color,
+                                                     textShadow: "0 0 1px rgba(0,0,0,0.5)"
+                                                 }}
+                                            >{s.user.nickname}</div>
+                                        ))}
+                                    </div>
+                                </Tooltip.Content>
+                            </Tooltip>
+                        )}
                     </div>
                     <div className="flex-1 min-h-0 overflow-hidden max-h-32 lg:max-h-none">
                         {userInfo && (
@@ -769,18 +880,7 @@ function GameRoomContent() {
                                 <Badge.Anchor className={"m-1"}>
                                     <ShowUserInfo
                                         type={"lg"}
-                                        player={{
-                                            user: userInfo,
-                                            latency: playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0,
-                                            ready: false,
-                                            card: [],
-                                            point: players.find((p) => p.user.userId === userInfo.userId)?.point || {
-                                                count: 0,
-                                                list: []
-                                            },
-                                            currentPlayerCard: undefined,
-                                            lastPlayerCard: undefined
-                                        }}
+                                        player={selfPlayerInfo}
                                         latency={playerLatencies.find(pl => pl.userId === userInfo.userId)?.latency ?? 0}
                                         showEditButton={true}
                                         onEdit={() => {
@@ -789,20 +889,10 @@ function GameRoomContent() {
                                     />
                                     {isUserReady && (
                                         <Badge color={"success"} size={"sm"}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                                 strokeWidth="1.5" stroke="currentColor" className="size-2.5"
-                                                 color={"white"}>
-                                                <path strokeLinecap="round" strokeLinejoin="round"
-                                                      d="m4.5 12.75 6 6 9-13.5"/>
-                                            </svg>
+                                            <Check size={10} />
                                         </Badge>
                                     )}
                                 </Badge.Anchor>
-                                {players.length === 0 && (
-                                    <div className="text-center text-xs text-slate-400 py-4">
-                                        {isConnected ? isInRoom ? '等待其他玩家加入...' : '未加入房间' : '未连接'}
-                                    </div>
-                                )}
                                 {players.map((p) => (
                                     p.user.userId !== userInfo?.userId && (
                                         <div key={p.user.userId}
@@ -815,18 +905,17 @@ function GameRoomContent() {
                                                     onEdit={() => setIsEditModalOpen(true)}
                                                 />
                                                 {p.ready && <Badge color={"success"} size={"sm"}>
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                         viewBox="0 0 24 24"
-                                                         strokeWidth="1.5" stroke="currentColor" className="size-2.5"
-                                                         color={"white"}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                                              d="m4.5 12.75 6 6 9-13.5"/>
-                                                    </svg>
+                                                    <Check size={10} />
                                                 </Badge>}
                                             </Badge.Anchor>
                                         </div>
                                     )
                                 ))}
+                                {players.length < 2 && (
+                                    <div className="text-center text-xs text-slate-400 py-4">
+                                        {isConnected ? isInRoom ? '等待其他玩家加入...' : '未加入房间' : '未连接'}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -893,11 +982,7 @@ function GameRoomContent() {
                             <Popover isOpen={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
                                 <Popover.Trigger>
                                     <Button variant="outline" style={{width: '25px', height: '32px'}}>
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                             strokeWidth="1.5" stroke="currentColor" className="size-5 md:size-6">
-                                            <path strokeLinecap="round" strokeLinejoin="round"
-                                                  d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z"/>
-                                        </svg>
+                                        <FaceSmile className={"size-5 md:size-6"} />
                                     </Button>
                                 </Popover.Trigger>
                                 <Popover.Content className="p-2">
@@ -921,12 +1006,7 @@ function GameRoomContent() {
                                         handleSendChatMessage(chatInputValue);
                                     }}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                     strokeWidth="1.5" stroke="currentColor" className="size-5 md:size-6"
-                                     transform={"rotate(270)"}>
-                                    <path strokeLinecap="round" strokeLinejoin="round"
-                                          d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
-                                </svg>
+                                <PaperAirplane className={"size-5 md:size-6"} transform="rotate(270)" />
                             </Button>
                         </div>
                     </div>
@@ -936,11 +1016,7 @@ function GameRoomContent() {
                 <div className="flex items-center justify-between px-2 opacity-40">
                     <a href="https://github.com/ChiyukiRuon/holsder-geier-web" target="_blank" rel="noopener noreferrer"
                        className="hover:opacity-100 transition-opacity">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                             fill="currentColor">
-                            <path
-                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
+                        <GitHub />
                     </a>
                     <div className="flex gap-1 md:gap-2 text-[8px] md:text-[10px] font-bold text-slate-600 uppercase">
                         <span>{isConnected ? serverInfo ? `SERVER ${serverInfo.version}` : 'Connected' : 'Disconnected'}</span>
@@ -987,29 +1063,37 @@ function GameRoomContent() {
                                 {/* 内容区 */}
                                 <Modal.Body className="p-6 space-y-6">
                                     {/* 获胜者展示 */}
-                                    <div className="text-center space-y-4">
-                                        <div className="inline-block relative">
-                                            <div
-                                                className="absolute -inset-4 bg-linear-to-r from-amber-400 via-yellow-500 to-amber-400 rounded-full opacity-20 animate-pulse"/>
-                                            <ShowUserInfo
-                                                type={"md"}
-                                                player={players.find((p) => p.user.userId === gameEndData?.winnerId)}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="space-y-2">
-                                                <div className="text-4xl font-black text-amber-500">
-                                                    🏆 {players.find((p) => p.user.userId === gameEndData?.winnerId)?.user.nickname}
-                                                </div>
+                                    {gameEndData?.winnerId ? (
+                                        <div className="text-center space-y-4">
+                                            <div className="inline-block relative">
                                                 <div
-                                                    className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                                                    最终得分: <span
-                                                    className="text-amber-600 text-lg">{gameEndData?.rankings.find((r) => r.playerId === gameEndData.winnerId)?.total ?? 0}</span> 分
+                                                    className="absolute -inset-4 bg-linear-to-r from-amber-400 via-yellow-500 to-amber-400 rounded-full opacity-20 animate-pulse"/>
+                                                <ShowUserInfo
+                                                    type={"md"}
+                                                    player={players.find((p) => p.user.userId === gameEndData?.winnerId)}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="space-y-2">
+                                                    <div className="text-4xl font-black text-amber-500">
+                                                        🏆 {players.find((p) => p.user.userId === gameEndData?.winnerId)?.user.nickname}
+                                                    </div>
+                                                    <div
+                                                        className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                                                        最终得分: <span
+                                                        className="text-amber-600 text-lg">{gameEndData?.rankings.find((r) => r.playerId === gameEndData.winnerId)?.totalPoint ?? 0}</span> 分
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="text-center space-y-4">
+                                            <div className="inline-block relative">
+                                                无人获胜
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* 排行榜 */}
                                     <div className="border-t-2 border-slate-200 pt-4">
@@ -1027,30 +1111,37 @@ function GameRoomContent() {
                                                     <div
                                                         key={player.playerId}
                                                         className={`flex flex-col p-3 rounded-xl border-2 transition-all
-                                                            ${index === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}                                                        `}
+                                                            ${gameEndData.winnerId && index === 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}                                                        `}
                                                     >
                                                         {/* 玩家信息首行 */}
                                                         <div className="flex items-center justify-between mb-3">
                                                             <div className="flex items-center gap-3">
                                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm
-                                                                    ${index === 0 ? 'bg-amber-400 text-white' :
-                                                                    index === 1 ? 'bg-slate-400 text-white' :
-                                                                        index === 2 ? 'bg-orange-400 text-white' :
+                                                                    ${gameEndData.winnerId && index === 0 ? 'bg-amber-400 text-white' :
+                                                                    gameEndData.winnerId && index === 1 ? 'bg-slate-400 text-white' :
+                                                                        gameEndData.winnerId && index === 2 ? 'bg-orange-400 text-white' :
                                                                             'bg-slate-200 text-slate-600'}                                                                `}>
                                                                     {index + 1}
                                                                 </div>
                                                                 <div className="flex flex-col">
-                                                                    <span className="font-black text-slate-700 text-sm">
-                                                                        {players.find((p) => p.user.userId === player.playerId)?.user.nickname}
+                                                                    <span className="font-black text-slate-700 text-sm flex gap-1 items-center">
+                                                                        <div>
+                                                                            {players.find((p) => p.user.userId === player.playerId)?.user.nickname}
+                                                                        </div>
+                                                                        {selfPlayerInfo?.user.userId === player.playerId && (
+                                                                            <span className="text-[8px] text-amber-600 font-bold uppercase">
+                                                                                (你)
+                                                                            </span>
+                                                                        )}
                                                                     </span>
                                                                     <span
                                                                         className="text-[10px] text-slate-400 font-bold uppercase">
                                                                         Total: <span
-                                                                        className={index === 0 ? 'text-amber-600' : 'text-slate-600'}>{player.total} PT</span>
+                                                                        className={gameEndData.winnerId && index === 0 ? 'text-amber-600' : 'text-slate-600'}>{player.totalPoint} PT</span>
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            {index === 0 && gameEndData.winnerId ? (
+                                                            {gameEndData.winnerId && index === 0 ? (
                                                                 <span className="text-2xl animate-bounce">👑</span>
                                                             ) : (
                                                                 <span
@@ -1102,21 +1193,38 @@ function GameRoomContent() {
                                     >
                                         关闭
                                     </Button>
-                                    <Button
-                                        className="flex-1 font-black text-sm uppercase tracking-wider"
-                                        style={{
-                                            height: '44px',
-                                            backgroundColor: '#3b82f6',
-                                            color: 'white',
-                                            border: '2px solid #2563eb',
-                                        }}
-                                        onPress={() => {
-                                            setIsGameEndModalOpen(false);
-                                            handleUserReady();
-                                        }}
-                                    >
-                                        准备
-                                    </Button>
+                                    {selfPlayerInfo?.role === "player" ? (
+                                        <Button
+                                            className="flex-1 font-black text-sm uppercase tracking-wider"
+                                            style={{
+                                                height: '44px',
+                                                backgroundColor: '#3b82f6',
+                                                color: 'white',
+                                                border: '2px solid #2563eb',
+                                            }}
+                                            onPress={() => {
+                                                setIsGameEndModalOpen(false);
+                                                handleUserReady();
+                                            }}
+                                        >
+                                            准备
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            className="flex-1 font-black text-sm uppercase tracking-wider"
+                                            style={{
+                                                height: '44px',
+                                                backgroundColor: '#3b82f6',
+                                                color: 'white',
+                                                border: '2px solid #2563eb',
+                                            }}
+                                            onPress={() => {
+                                                setIsGameEndModalOpen(false);
+                                            }}
+                                        >
+                                            确定
+                                        </Button>
+                                    )}
                                 </Modal.Footer>
                             </Modal.Dialog>
                         </Modal.Container>

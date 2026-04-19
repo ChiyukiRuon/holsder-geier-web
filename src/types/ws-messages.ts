@@ -4,7 +4,7 @@ import type {
     RoomInfo,
     SendChatMessage, PlayerInfo, PlayerLatency, ReceiveChatMessage,
 } from './base';
-import type {RoomStatus, WSErrorCode} from './enums';
+import type {RoomRole, RoomStatus, WSErrorCode} from './enums';
 import type { GameState } from './game';
 
 // 客户端 → 服务端消息
@@ -33,6 +33,13 @@ export interface RoomJoinMessage extends WSMessageBase {
 export interface RoomLeaveMessage extends WSMessageBase {
     type: 'room.leave';
     payload: Record<string, never>;
+}
+
+export interface RoomRoleMessage extends WSMessageBase {
+    type: 'room.role';
+    payload: {
+        role: RoomRole;
+    };
 }
 
 export interface GameReadyMessage extends WSMessageBase {
@@ -129,6 +136,7 @@ export interface GameStartMessage extends WSMessageBase {
     type: 'game.start';
     payload: {
         players: PlayerInfo[];
+        spectators: PlayerInfo[];
         state: GameState;
     };
 }
@@ -137,6 +145,7 @@ export interface GameStateMessage extends WSMessageBase {
     type: 'game.state';
     payload: {
         players: PlayerInfo[];
+        spectators: PlayerInfo[];
         state: GameState;
     };
 }
@@ -145,6 +154,7 @@ export interface GameResolveMessage extends WSMessageBase {
     type: 'game.resolve';
     payload: {
         players: PlayerInfo[];
+        spectators: PlayerInfo[];
         state: GameState;
         roundWinner: PlayerInfo | null;
     };
@@ -166,7 +176,7 @@ export interface GameEndMessage extends WSMessageBase {
         winnerId?: string;
         rankings: Array<{
             playerId: string
-            total: number
+            totalPoint: number
         }>;
         playerPointDetails: Array<{
             playerId: string
@@ -174,6 +184,7 @@ export interface GameEndMessage extends WSMessageBase {
             totalPoint: number
         }>;
         players: PlayerInfo[];
+        spectators: PlayerInfo[];
         state: GameState;
     };
 }
@@ -212,7 +223,7 @@ export type ClientMessage =
     | RoomCreateMessage
     | RoomJoinMessage
     | RoomLeaveMessage
-    | RoomListMessage
+    | RoomRoleMessage
     | GameReadyMessage
     | GameStateMessage
     | GameActionMessage

@@ -1,8 +1,9 @@
 import React from "react";
-import { Avatar, Card } from "@heroui/react";
+import {Avatar, Card, Tooltip} from "@heroui/react";
 import PointCard from "@/components/PointCard";
 import LinkSlash from "@/components/icons/LinkSlash";
 import {PlayerInfo, PlayerLatency, UserInfo} from "@/types";
+import Eye from "@/components/icons/Eye";
 
 interface UserCardProps {
     type: "sm" | "md" | "lg";
@@ -12,6 +13,7 @@ interface UserCardProps {
     latency?: PlayerLatency["latency"]
     onEdit?: () => void;
     showEditButton?: boolean;
+    showPlayerRole?: boolean;
 }
 
 export default function ShowUserInfo({
@@ -22,6 +24,7 @@ export default function ShowUserInfo({
     latency,
     onEdit,
     showEditButton = false,
+    showPlayerRole = true,
 }: UserCardProps) {
     if (!player && !user) return null;
     const userInfo = (user || player?.user) as UserInfo;
@@ -118,49 +121,64 @@ export default function ShowUserInfo({
 
                     {/* 得分牌数量 */}
                     <div className="flex items-center gap-1.5">
-                        <div className="flex items-center bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
-                            <PointCard cardFace={"back"} width={10} height={14} />
-                            <span className="ml-1 text-[10px] font-bold text-slate-400">x</span>
-                            <span className="ml-0.5 text-xs font-black text-amber-600 leading-none">
-                        {player.point.count}
-                    </span>
-                        </div>
+                        {player.role === "player" ? (
+                            <div className="flex items-center bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200 shadow-sm">
+                                <PointCard cardFace={"back"} width={10} height={14} />
+                                <span className="ml-1 text-[10px] font-bold text-slate-400">x</span>
+                                <span className="ml-0.5 text-xs font-black text-amber-600 leading-none">
+                                    {player.point.count}
+                                </span>
+                            </div>
+                        ) : (
+                            showPlayerRole && (
+                                <Tooltip delay={0}>
+                                    <Tooltip.Trigger>
+                                        <Eye className={"size-5 text-slate-400"} />
+                                    </Tooltip.Trigger>
+                                    <Tooltip.Content>
+                                        <span className="text-slate-500">观战</span>
+                                    </Tooltip.Content>
+                                </Tooltip>
+                            )
+                        )}
                     </div>
                 </div>
 
-                {/* 网络状态 */}
-                <div className="flex flex-col items-end gap-1">
-                    {latency === -999 ? (
-                        <div
-                            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">
-                            <LinkSlash size={14}/>
-                            <span className="text-[10px] font-bold">OFFLINE</span>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-end">
-                        <div className="flex gap-0.5 mb-0.5">
-                                {/* 模拟信号格 */}
-                                {[1, 2, 3].map((i) => (
-                                    <div
-                                        key={i}
-                                        className={`w-1 h-${1 + i} rounded-full ${
-                                            latency! < 50 ? "bg-green-500" :
-                                                latency! > 150 && i > 1 ? "bg-slate-200" :
-                                                    latency! <= 150 && i === 3 ? "bg-slate-200" : "bg-amber-400"
-                                        }`}
-                                    />
-                                ))}
-                            </div>
+                <div className={"flex gap-2 items-center"}>
+                    {/* 网络状态 */}
+                    <div className="flex flex-col items-end gap-1">
+                        {latency === -999 ? (
                             <div
-                                className="text-[10px] font-mono font-bold"
-                                style={{
-                                    color: latency! < 50 ? "#22c55e" : latency! > 150 ? "#ef4444" : "#f59e0b"
-                                }}
-                            >
-                                {latency}<span className="opacity-70 font-sans ml-0.5">ms</span>
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">
+                                <LinkSlash size={14}/>
+                                <span className="text-[10px] font-bold">OFFLINE</span>
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="flex flex-col items-end">
+                                <div className="flex gap-0.5 mb-0.5">
+                                    {/* 模拟信号格 */}
+                                    {[1, 2, 3].map((i) => (
+                                        <div
+                                            key={i}
+                                            className={`w-1 h-${1 + i} rounded-full ${
+                                                latency! < 50 ? "bg-green-500" :
+                                                    latency! > 150 && i > 1 ? "bg-slate-200" :
+                                                        latency! <= 150 && i === 3 ? "bg-slate-200" : "bg-amber-400"
+                                            }`}
+                                        />
+                                    ))}
+                                </div>
+                                <div
+                                    className="text-[10px] font-mono font-bold"
+                                    style={{
+                                        color: latency! < 50 ? "#22c55e" : latency! > 150 ? "#ef4444" : "#f59e0b"
+                                    }}
+                                >
+                                    {latency}<span className="opacity-70 font-sans ml-0.5">ms</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </Card.Content>
         </Card>

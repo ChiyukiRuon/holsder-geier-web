@@ -4,7 +4,7 @@ import type {
     WSMessage,
     WSEventHandler,
     WSConnectionOptions,
-    WSRequestMap,
+    WSRequestMap, RoomRole,
 } from '@/types';
 
 class WebSocketManager {
@@ -177,6 +177,17 @@ class WebSocketManager {
             type: 'room.leave',
             requestId: this.generateRequestId(),
             payload: {},
+        });
+    }
+
+    /**
+     * 角色切换
+     */
+    changeRole(role: RoomRole) {
+        return this.sendWithAck({
+            type: 'room.role',
+            requestId: this.generateRequestId(),
+            payload: {role},
         });
     }
 
