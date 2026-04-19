@@ -1,15 +1,44 @@
 'use client';
 
-import React, { useState, useLayoutEffect, useRef } from "react";
-import { HandCard } from "@/components/HandCard";
-import { UserInfo } from "@/types";
+import React, {useLayoutEffect, useRef, useState} from "react";
+import {HandCard} from "@/components/HandCard";
+import {UserInfo} from "@/types";
 
-export const DynamicHand = ({ cards, user, onCardPlayAction }: { cards: number[], user: UserInfo, onCardPlayAction?: (card: number) => void }) => {
+interface DynamicHandProps {
+    cards: number[];
+    user: UserInfo;
+    onCardPlayAction?: (card: number) => void;
+    playAreaRef?: React.RefObject<HTMLDivElement | null>;
+    setIsPlayAreaHover?: (v: boolean) => void;
+    setIsDragging?: (v: boolean) => void;
+}
+
+export const DynamicHand = ({
+                                cards,
+                                user,
+                                onCardPlayAction,
+                                playAreaRef,
+                                setIsPlayAreaHover,
+                                setIsDragging
+                            }: DynamicHandProps) => {
+
     const containerRef = useRef<HTMLDivElement>(null);
-    const [containerWidth, setContainerWidth] = useState(0);
-    const [draggedCardIndex, setDraggedCardIndex] = useState<number | null>(null);
 
-    // 监听容器大小变化
+    const [containerWidth, setContainerWidth] = useState(0);
+
+    const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+    const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
+    const [isOverPlayArea, setIsOverPlayArea] = useState(false);
+    const [isReturning, setIsReturning] = useState(false);
+    const [isActuallyDragging, setIsActuallyDragging] = useState(false);
+    const [isScrolling, setIsScrolling] = useState(false);
+
+    const startPosRef = useRef({ x: 0, y: 0 });
+
+    // 手势判定状态
+    const hasDecidedRef = useRef(false);
+
+    // 宽度监听
     useLayoutEffect(() => {
         if (!containerRef.current) return;
 
@@ -17,92 +46,230 @@ export const DynamicHand = ({ cards, user, onCardPlayAction }: { cards: number[]
             setContainerWidth(containerRef.current?.offsetWidth || 0);
         };
 
-        const resizeObserver = new ResizeObserver(updateWidth);
-        resizeObserver.observe(containerRef.current);
+        const observer = new ResizeObserver(updateWidth);
+        observer.observe(containerRef.current);
 
         updateWidth();
-        return () => resizeObserver.disconnect();
+        return () => observer.disconnect();
     }, []);
 
-    // 计算逻辑
+    // 手牌布局
     const cardWidth = 112;
     const n = cards.length;
 
     let negativeMargin = 0;
-    if (containerWidth > 0 && n > 1) {
-        const totalRequiredWidth = n * cardWidth;
-        if (totalRequiredWidth > containerWidth) {
-            const visibleWidthPerCard = (containerWidth - cardWidth) / (n - 1);
-            negativeMargin = cardWidth - visibleWidthPerCard;
+    let totalWidth = 0;
+
+    if (n > 0) {
+        // 计算总宽度：第一张卡完整宽度 + 后续卡牌的重叠部分
+        // 目标：让手牌总宽度不超过容器宽度的 90%（留边距）
+        const maxAllowedWidth = containerWidth * 0.9;
+
+        if (containerWidth > 0 && n > 1) {
+            // 理想情况下每张卡牌应该占据的宽度
+            const idealWidthPerCard = maxAllowedWidth / n;
+
+            if (cardWidth > idealWidthPerCard) {
+                // 需要重叠：负边距 = 卡牌宽度 - 每张卡分配的宽度
+                negativeMargin = cardWidth - idealWidthPerCard;
+            } else {
+                // 不需要重叠时，保持至少20%的重叠
+                // 20%重叠意味着每张卡牌占据80%的宽度
+                negativeMargin = cardWidth * 0.2;
+            }
         }
+
+        // 计算实际总宽度用于居中
+        totalWidth = cardWidth + (n - 1) * (cardWidth - negativeMargin);
     }
 
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-        setDraggedCardIndex(index);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', index.toString());
+    // Pointer
+    const handlePointerDown = (e: React.PointerEvent, index: number) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 
-        const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
-        dragImage.style.position = 'absolute';
-        dragImage.style.top = '-9999px';
-        document.body.appendChild(dragImage);
-        e.dataTransfer.setDragImage(e.currentTarget, 56, 80);
+        setDraggingIndex(index);
+        setGhostPos({
+            x: rect.left,
+            y: rect.top
+        });
 
-        setTimeout(() => {
-            document.body.removeChild(dragImage);
-        }, 0);
+        startPosRef.current = {
+            x: e.clientX,
+            y: e.clientY
+        };
+
+        setIsActuallyDragging(false);
+        setIsScrolling(false);
+        hasDecidedRef.current = false;
+
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     };
 
-    const handleDragEnd = () => {
-        setDraggedCardIndex(null);
-    };
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (draggingIndex === null) return;
 
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        const cardIndex = parseInt(e.dataTransfer.getData('text/plain'));
-        if (!isNaN(cardIndex) && onCardPlayAction) {
-            onCardPlayAction(cards[cardIndex]);
+        const dx = e.clientX - startPosRef.current.x;
+        const dy = e.clientY - startPosRef.current.y;
+
+        // 手势判定 - 提高阈值到 15px,更容易触发拖拽
+        if (!hasDecidedRef.current) {
+            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+                // 更宽松的判定:只要纵向移动明显就认为是拖拽
+                if (Math.abs(dy) > Math.abs(dx) * 0.8) {
+                    setIsActuallyDragging(true);
+                } else {
+                    setIsScrolling(true);
+                }
+                hasDecidedRef.current = true;
+            }
+            return; // 判定期间不更新位置
         }
-        setDraggedCardIndex(null);
+
+        // 横向滑动不拖牌
+        if (isScrolling) return;
+
+        // 纵向拖动移动卡 - 使用绝对位置而非累加
+        if (isActuallyDragging) {
+            const originalRect = containerRef.current?.children[0]?.children[draggingIndex]?.getBoundingClientRect();
+
+            if (originalRect) {
+                setGhostPos({
+                    x: originalRect.left + dx,
+                    y: originalRect.top + dy
+                });
+            }
+
+            // 出牌区检测
+            const playArea = playAreaRef?.current;
+            if (playArea) {
+                const rect = playArea.getBoundingClientRect();
+
+                const inside =
+                    e.clientX >= rect.left &&
+                    e.clientX <= rect.right &&
+                    e.clientY >= rect.top &&
+                    e.clientY <= rect.bottom;
+
+                setIsOverPlayArea(inside);
+                setIsPlayAreaHover?.(inside);
+            }
+        }
     };
 
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+    const handlePointerUp = () => {
+        if (draggingIndex === null) return;
+
+        // 滑动不算拖牌
+        if (!isActuallyDragging) {
+            reset();
+            return;
+        }
+
+        if (isOverPlayArea) {
+            onCardPlayAction?.(cards[draggingIndex]);
+            reset();
+            setIsPlayAreaHover?.(false);
+        } else {
+            setIsReturning(true);
+            setIsPlayAreaHover?.(false);
+
+            setTimeout(() => {
+                reset();
+                setIsReturning(false);
+            }, 200);
+        }
     };
+
+    const reset = () => {
+        setDraggingIndex(null);
+        setIsOverPlayArea(false);
+        setIsActuallyDragging(false);
+        setIsScrolling(false);
+        hasDecidedRef.current = false;
+    };
+
+    // 通知父组件
+    React.useEffect(() => {
+        setIsDragging?.(draggingIndex !== null && isActuallyDragging);
+    }, [draggingIndex, isActuallyDragging, setIsDragging]);
 
     return (
-        <div
-            ref={containerRef}
-            className="w-full h-full flex justify-center items-end overflow-visible px-4"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-        >
-            <div className="flex items-end">
-                {cards.map((val, index) => (
-                    <div
-                        key={`${val}-${index}`}
-                        draggable={true}
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnd={handleDragEnd}
-                        style={{
-                            marginLeft: index === 0 ? 0 : -negativeMargin,
-                            zIndex: draggedCardIndex === index ? 100 : index,
-                            cursor: 'grabbing',
-                            transition: 'all 0.2s ease-out',
-                            transform: draggedCardIndex === index ? 'translateY(-30px) scale(1.05)' : 'translateY(0)',
-                        }}
-                        className="transition-[margin] duration-300 ease-out hover:-translate-y-4"
-                    >
-                        <HandCard
-                            value={val}
-                            user={user}
-                            cardFace={"front"}
-                            showBadge={false}
-                        />
-                    </div>
-                ))}
+        <>
+            {/* 手牌 */}
+            <div
+                ref={containerRef}
+                className={`w-full h-full px-4 no-scrollbar ${totalWidth > containerWidth ? 'overflow-x-auto' : 'overflow-x-visible'} ${totalWidth > containerWidth ? 'overflow-y-hidden' : 'overflow-y-visible'}`}
+                style={{
+                    touchAction: totalWidth > containerWidth ? 'pan-x' : 'auto',
+                    WebkitOverflowScrolling: 'touch'
+                }}
+            >
+                <div
+                    className="flex items-end pb-8 min-w-max mx-auto"
+                    style={{
+                        width: totalWidth,
+                        maxWidth: '100%'
+                    }}
+                >
+                    {cards.map((val, index) => {
+
+                        const isDragging = draggingIndex === index;
+
+                        return (
+                            <div
+                                key={`${val}-${index}`}
+                                onPointerDown={(e) => handlePointerDown(e, index)}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerCancel={handlePointerUp}
+                                style={{
+                                    marginLeft: index === 0 ? 0 : -negativeMargin,
+                                    opacity: isDragging && isActuallyDragging ? 0 : 1,
+                                    transition: 'all 0.2s ease-out',
+                                    touchAction: isScrolling ? 'auto' : 'none',
+                                    flexShrink: 0,
+                                    zIndex: isDragging ? 9999 : 1,
+                                }}
+                                className="group hover:-translate-y-6"
+                            >
+                                <HandCard
+                                    value={val}
+                                    user={user}
+                                    cardFace={"front"}
+                                    showBadge={false}
+                                    enableHover={false}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-        </div>
+
+            {/* 浮层卡 */}
+            {draggingIndex !== null && isActuallyDragging && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        left: ghostPos.x,
+                        top: ghostPos.y,
+                        zIndex: 9999,
+                        pointerEvents: 'none',
+                        transform: isOverPlayArea
+                            ? 'scale(1.2)'
+                            : 'scale(1.05)',
+                        transition: isReturning
+                            ? 'all 0.2s ease'
+                            : 'none'
+                    }}
+                >
+                    <HandCard
+                        value={cards[draggingIndex]}
+                        user={user}
+                        cardFace={"front"}
+                        showBadge={false}
+                    />
+                </div>
+            )}
+        </>
     );
 };

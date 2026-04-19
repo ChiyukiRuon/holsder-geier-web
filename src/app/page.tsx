@@ -3,7 +3,7 @@
 import packageJson from "../../package.json";
 import {Badge, Button, Input, Modal, Popover, ScrollShadow, Spinner, toast, Tooltip} from "@heroui/react";
 import ShowUserInfo from "@/components/ShowUserInfo";
-import {EditUserInfo} from "@/components/EditUserInfo";
+import {EditUserInfo} from "@/components/models/EditUserInfo";
 import {DynamicHand} from "@/components/DynamicHand";
 import {PlayAreaCard} from "@/components/PlayAreaCard";
 import {
@@ -642,6 +642,16 @@ function GameRoomContent() {
                             {/* 手牌区背景阴影 */}
                             <div
                                 className="absolute -inset-x-8 top-12 -bottom-8 bg-linear-to-t from-slate-900/10 to-transparent pointer-events-none"/>
+
+                            <div className="h-full flex items-end justify-center">
+                                <DynamicHand cards={[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]} user={{
+                                    "userId": "7075dbfb-dc33-4473-a869-8aeca07f6f2d",
+                                    "nickname": "千雪琉音",
+                                    "avatar": "https://img.kookapp.cn/attachments/2025-10/27/uiiwg0iO010hs0hs.jpg?x-oss-process=style/icon",
+                                    "background": "https://cdn.chiyukiruon.top/hdg/background/97e214a6-21d2-488e-8d79-e636b27e59a0.jpeg",
+                                    "color": "#23A6E8"
+                                }} />
+                            </div>
 
                             {!isInRoom ? null : selfPlayerInfo?.role === 'spectator' ? (
                                 <div className="flex flex-col gap-2 items-center justify-center h-full animate-in fade-in zoom-in duration-300">
