@@ -210,6 +210,8 @@ function GameRoomInner() {
                         userInfo={userInfo}
                         playerLatencies={session.playerLatencies}
                         onUpdateUserInfo={handleUpdateUserInfo}
+                        isConnected={session.isConnected}
+                        isInRoom={session.isInRoom}
                     />
                 </div>
             </div>

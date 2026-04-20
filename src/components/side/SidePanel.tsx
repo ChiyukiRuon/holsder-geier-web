@@ -55,6 +55,8 @@ export default function SidePanel({
                 userInfo={userInfo}
                 playerLatencies={playerLatencies}
                 onUpdateUserInfo={handleUpdateUserInfo}
+                isInRoom={session.isInRoom}
+                isConnected={session.isConnected}
             />
             <ChatBox chat={chat} userInfo={userInfo} />
 
