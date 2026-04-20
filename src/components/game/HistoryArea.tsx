@@ -24,8 +24,7 @@ export default function HistoryArea({ gameState, players }: HistoryAreaProps) {
     return (
         <div className="flex flex-col gap-2 mt-auto">
             {/* 标签区域 */}
-            <div className="flex items-center gap-2 px-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-400"/>
+            <div className="hidden md:flex items-center gap-2 px-2">
                 <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     History
                 </span>
@@ -33,7 +32,7 @@ export default function HistoryArea({ gameState, players }: HistoryAreaProps) {
 
             {/* 卡牌展示容器 */}
             <div className="rounded-2xl bg-slate-200/30 border-2 border-dashed border-slate-300/50">
-                <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-center gap-4 md:gap-8 overflow-x-auto min-h-20 md:min-h-25">
+                <div className="px-2 md:px-6 py-2 md:py-4 flex items-center justify-center gap-2 md:gap-8 overflow-x-auto min-h-16 md:min-h-25">
                     {lastPlayedCards.length > 0 ? (
                         lastPlayedCards.map((player) => (
                             <div key={player.user.userId}

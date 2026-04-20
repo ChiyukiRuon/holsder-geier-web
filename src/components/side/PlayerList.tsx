@@ -16,7 +16,7 @@ interface PlayerListProps {
     };
     userInfo: UserInfo | null;
     playerLatencies?: PlayerLatency[];
-    onUpdateUserInfo?: <K extends keyof UserInfo>(key: K, value: UserInfo[K]) => void;
+    onUpdateUserInfo?: (userInfo: UserInfo) => void;
     isConnected?: boolean;
     isInRoom?: boolean;
 }
@@ -91,15 +91,20 @@ export default function PlayerList({
                         </Tooltip>
                     )}
                 </div>
-                <div className="flex-1 min-h-0 overflow-hidden max-h-32 lg:max-h-none">
+                <div className="flex-1 min-h-0 overflow-hidden max-h-none">
                     {userInfo && selfPlayerInfo && (
-                        <div className="flex flex-col gap-1 h-full overflow-y-auto">
+                        <div className="flex flex-col gap-1 h-full">
                             {/* 当前玩家 */}
                             <Badge.Anchor className={"m-1"}>
                                 <ShowUserInfo
                                     type={"lg"}
                                     player={selfPlayerInfo}
-                                    latency={playerLatencies.find((pl) => pl.userId === userInfo.userId)?.latency ?? 0}
+                                    latency={(() => {
+                                        const pingLatency = playerLatencies.find((pl) => pl.userId === userInfo.userId)?.latency;
+                                        if (pingLatency !== undefined) return pingLatency;
+                                        if (selfPlayerInfo.latency !== undefined) return selfPlayerInfo.latency;
+                                        return 0;
+                                    })()}
                                     showEditButton={true}
                                     onEdit={() => setIsEditModalOpen(true)}
                                 />
@@ -148,10 +153,7 @@ export default function PlayerList({
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={(data) => {
                         if (onUpdateUserInfo) {
-                            if (data.nickname) onUpdateUserInfo("nickname", data.nickname);
-                            if (data.avatar) onUpdateUserInfo("avatar", data.avatar);
-                            if (data.color) onUpdateUserInfo("color", data.color);
-                            if (data.background) onUpdateUserInfo("background", data.background);
+                            onUpdateUserInfo(data)
                         }
                     }}
                     initialData={userInfo}

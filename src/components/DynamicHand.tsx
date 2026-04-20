@@ -8,7 +8,7 @@ interface DynamicHandProps {
     cards: number[];
     user: UserInfo;
     onCardPlayAction?: (card: number) => void;
-    playAreaRef?: React.RefObject<HTMLDivElement | null>;
+    centerAreaRef?: React.RefObject<HTMLDivElement | null>;
     setIsPlayAreaHover?: (v: boolean) => void;
     setIsDragging?: (v: boolean) => void;
 }
@@ -17,7 +17,7 @@ export const DynamicHand = ({
                                 cards,
                                 user,
                                 onCardPlayAction,
-                                playAreaRef,
+                                centerAreaRef,
                                 setIsPlayAreaHover,
                                 setIsDragging
                             }: DynamicHandProps) => {
@@ -53,33 +53,51 @@ export const DynamicHand = ({
         return () => observer.disconnect();
     }, []);
 
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY !== 0 && el.scrollWidth > el.clientWidth) {
+                // 如果是纵向滚轮且有横向溢出，则转换滚动方向
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, []);
+
     // 手牌布局
     const cardWidth = 112;
     const n = cards.length;
+
+    // 设置最大重叠限制
+    const maxOverlapLimit = cardWidth * 0.5;
 
     let negativeMargin = 0;
     let totalWidth = 0;
 
     if (n > 0) {
-        // 计算总宽度：第一张卡完整宽度 + 后续卡牌的重叠部分
-        // 目标：让手牌总宽度不超过容器宽度的 90%（留边距）
+        // 尝试让手牌总宽度保持在容器宽度的 90%
         const maxAllowedWidth = containerWidth * 0.9;
 
         if (containerWidth > 0 && n > 1) {
-            // 理想情况下每张卡牌应该占据的宽度
             const idealWidthPerCard = maxAllowedWidth / n;
 
             if (cardWidth > idealWidthPerCard) {
-                // 需要重叠：负边距 = 卡牌宽度 - 每张卡分配的宽度
-                negativeMargin = cardWidth - idealWidthPerCard;
+                // 计算为了挤进容器需要的重叠量
+                const requiredMargin = cardWidth - idealWidthPerCard;
+                negativeMargin = Math.min(requiredMargin, maxOverlapLimit);
             } else {
-                // 不需要重叠时，保持至少20%的重叠
-                // 20%重叠意味着每张卡牌占据80%的宽度
+                // 卡片较少时，保持 20% 的固定重叠，增加紧凑感
                 negativeMargin = cardWidth * 0.2;
             }
         }
 
-        // 计算实际总宽度用于居中
+        // 2. 重新计算实际总宽度
+        // 此时 totalWidth 可能会超过 containerWidth，从而触发横向滚动
         totalWidth = cardWidth + (n - 1) * (cardWidth - negativeMargin);
     }
 
@@ -102,7 +120,7 @@ export const DynamicHand = ({
         setIsScrolling(false);
         hasDecidedRef.current = false;
 
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        // (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
@@ -117,6 +135,7 @@ export const DynamicHand = ({
                 // 更宽松的判定:只要纵向移动明显就认为是拖拽
                 if (Math.abs(dy) > Math.abs(dx) * 0.8) {
                     setIsActuallyDragging(true);
+                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
                 } else {
                     setIsScrolling(true);
                 }
@@ -139,11 +158,9 @@ export const DynamicHand = ({
                 });
             }
 
-            // 出牌区检测
-            const playArea = playAreaRef?.current;
-            if (playArea) {
-                const rect = playArea.getBoundingClientRect();
-
+            const area = centerAreaRef?.current;
+            if (area) {
+                const rect = area.getBoundingClientRect();
                 const inside =
                     e.clientX >= rect.left &&
                     e.clientX <= rect.right &&
@@ -201,14 +218,15 @@ export const DynamicHand = ({
                 className={`w-full h-full px-4 no-scrollbar ${totalWidth > containerWidth ? 'overflow-x-auto' : 'overflow-x-visible'} ${totalWidth > containerWidth ? 'overflow-y-hidden' : 'overflow-y-visible'}`}
                 style={{
                     touchAction: totalWidth > containerWidth ? 'pan-x' : 'auto',
-                    WebkitOverflowScrolling: 'touch'
+                    WebkitOverflowScrolling: 'touch',
+                    maxWidth: '100%'
                 }}
             >
                 <div
                     className="flex items-end pb-8 min-w-max mx-auto"
                     style={{
                         width: totalWidth,
-                        maxWidth: '100%'
+                        maxWidth: 'none'
                     }}
                 >
                     {cards.map((val, index) => {
@@ -223,10 +241,11 @@ export const DynamicHand = ({
                                 onPointerUp={handlePointerUp}
                                 onPointerCancel={handlePointerUp}
                                 style={{
+                                    visibility: containerWidth === 0 ? 'hidden' : 'visible',
                                     marginLeft: index === 0 ? 0 : -negativeMargin,
                                     opacity: isDragging && isActuallyDragging ? 0 : 1,
                                     transition: 'all 0.2s ease-out',
-                                    touchAction: isScrolling ? 'auto' : 'none',
+                                    touchAction: 'pan-x',
                                     flexShrink: 0,
                                     zIndex: isDragging ? 9999 : 1,
                                 }}

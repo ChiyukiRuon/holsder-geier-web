@@ -15,7 +15,7 @@ interface HandAreaProps {
     isUserReady: boolean;
     onToggleReady: () => void;
     onPlayCard: (card: number) => void;
-    playAreaRef?: React.RefObject<HTMLDivElement | null>;
+    centerAreaRef?: React.RefObject<HTMLDivElement | null>;
     setIsPlayAreaHover?: (v: boolean) => void;
     setIsDragging?: (v: boolean) => void;
 }
@@ -29,7 +29,7 @@ export default function HandArea({
                                      isUserReady,
                                      onToggleReady,
                                      onPlayCard,
-                                     playAreaRef,
+                                     centerAreaRef,
                                      setIsPlayAreaHover,
                                      setIsDragging
                                  }: HandAreaProps) {
@@ -72,7 +72,7 @@ export default function HandArea({
                         cards={self?.card ?? []}
                         user={userInfo}
                         onCardPlayAction={onPlayCard}
-                        playAreaRef={playAreaRef}
+                        centerAreaRef={centerAreaRef}
                         setIsPlayAreaHover={setIsPlayAreaHover}
                         setIsDragging={setIsDragging}
                     />

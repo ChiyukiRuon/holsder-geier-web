@@ -47,7 +47,7 @@ export default function ChatBox({ chat, userInfo }: ChatBoxProps) {
     };
 
     return (
-        <div className="flex flex-col flex-1 min-h-0 bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] overflow-hidden">
+        <div className="flex flex-col h-full bg-white border-[3px] border-slate-800 rounded-2xl shadow-[6px_6px_0px_rgba(0,0,0,0.1)] overflow-hidden">
             <div className="flex-none px-3 md:px-4 py-2 bg-slate-800 text-white flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-1">
                     <span className="font-black text-[10px] uppercase tracking-[0.2em]">Chat</span>

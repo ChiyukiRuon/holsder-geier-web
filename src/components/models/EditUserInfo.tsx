@@ -222,7 +222,7 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                 </div>
 
                 <div className="flex flex-row h-120">
-                    <div className="w-1/3 bg-slate-50 border-r-[3px] border-slate-100 p-6 flex flex-col items-center justify-center gap-6">
+                    <div className="hidden md:flex w-1/3 bg-slate-50 border-r-[3px] border-slate-100 p-6 flex-col items-center justify-center gap-6">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">预览</span>
 
                         <div className="scale-125">
@@ -238,25 +238,25 @@ export const EditUserInfo = ({ isOpen, onClose, onSave, initialData }: EditUserI
                         </div>
                     </div>
 
-                    <div className="w-2/3 p-8 overflow-y-auto space-y-6">
+                    <div className="w-full md:w-2/3 p-8 overflow-y-auto space-y-6">
 
                         <section className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">玩家名</label>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                                 <input
-                                    className="flex-1 h-10 px-4 rounded-xl bg-slate-100 text-slate-900 font-bold text-sm border-[3px] border-slate-100 outline-none transition-all focus:border-slate-300 focus:bg-white placeholder:text-slate-400"
+                                    className="min-w-0 flex-1 h-10 px-4 rounded-xl bg-slate-100 text-slate-900 font-bold text-sm border-[3px] border-slate-100 outline-none transition-all focus:border-slate-300 focus:bg-white placeholder:text-slate-400"
                                     value={tempNickname}
                                     onChange={(e) => setTempNickname(e.target.value)}
                                     placeholder="Enter nickname..."
                                 />
                                 <button
-                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
+                                    className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
                                     onClick={handleKookLogin}
                                 >
                                     <KOOK size={20} />
                                 </button>
                                 <button
-                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
+                                    className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-all border-[3px] border-transparent hover:border-slate-300"
                                     onClick={() => handleGoogleLogin()}
                                 >
                                     <Google size={20} />
